@@ -3,17 +3,25 @@ import pandas as pd
 import requests
 import time
 
-st.set_page_config(page_title="My 100 EGP Growth", layout="wide")
+# 1. إعدادات الصفحة والجماليات
+st.set_page_config(page_title="AI Mega Radar 🚀", layout="wide")
 
-# إعدادات المحفظة
-st.sidebar.header("🕹️ لوحة تحكم الـ 100 جنيه")
-buy_price = st.sidebar.number_input("سعر شراء العملة (بالدولار):", value=0.000001, format="%.8f")
-target_profit_egp = st.sidebar.slider("هدفك الربحي (جنيه):", 1, 50, 10)
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; }
+    .stMetric { border: 1px solid #4b5563; padding: 10px; border-radius: 10px; }
+    </style>
+    """, unsafe_allow_html=True)
 
-st.title("💸 رادار نمو رأس المال")
-st.info(f"إنت بدأت بـ 100 جنيه. هدفنا نوصل لـ {100 + target_profit_egp} جنيه!")
+# 2. المحفظة الشخصية (الـ 100 جنيه)
+st.sidebar.title("💰 محفظة الـ 100 جنيه")
+buy_price = st.sidebar.number_input("سعر شراء عملتك (بالدولار):", value=0.000001, format="%.8f")
+target_profit = st.sidebar.slider("هدفك الربحي (بالجنيه):", 1, 100, 20)
 
-def get_mexc_stats():
+st.title("🎯 رادار القنص الموحد - نسخة الاستعادة")
+st.write("تم استعادة نظام مراقبة الحيتان وإدارة الـ 100 جنيه")
+
+def get_data():
     url = "https://api.mexc.com/api/v3/ticker/24hr"
     try: return requests.get(url, timeout=5).json()
     except: return None
@@ -21,43 +29,43 @@ def get_mexc_stats():
 placeholder = st.empty()
 
 while True:
-    stats_data = get_mexc_stats()
-    if stats_data:
-        # هنراقب PEPE كمثال لأن حركتها سريعة وهتحسسك بالـ 100 جنيه
-        target_coin = "PEPEUSDT" 
-        current_price = 0
+    data = get_data()
+    if data:
+        targets = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT']
+        rows = []
+        my_coin_price = 0
         
-        for item in stats_data:
-            if item['symbol'] == target_coin:
-                current_price = float(item['lastPrice'])
-                break
-        
-        # حسابات الـ 100 جنيه
-        capital_usd = 2.0 # الـ 100 جنيه
-        units = capital_usd / buy_price
-        current_value_usd = units * current_price
-        current_value_egp = current_value_usd * 50 # سعر الصرف
-        net_profit_egp = current_value_egp - 100
-        
-        with placeholder.container():
-            # العرض بالألوان عشان تحس بالفرق
-            color = "green" if net_profit_egp >= 0 else "red"
-            st.markdown(f"<h1 style='text-align: center; color: {color};'>قيمة فلوسك الآن: {current_value_egp:.2f} جنيه</h1>", unsafe_allow_html=True)
-            
-            # شريط التقدم للهدف
-            progress = min(max((net_profit_egp / target_profit_egp), 0.0), 1.0)
-            st.write(f"التقدم نحو الهدف (+{target_profit_egp} جنيه):")
-            st.progress(progress)
-            
-            col1, col2 = st.columns(2)
-            col1.metric("صافي الربح", f"{net_profit_egp:.2f} ج.م", delta=f"{net_profit_egp:.2f}")
-            col2.metric("سعر العملة اللحظي", f"${current_price:.8f}")
-            
-            st.divider()
-            st.write("### 📢 ملاحظة المدير:")
-            if net_profit_egp > 0:
-                st.success(f"مبروك! الـ 100 جنيه زادت {net_profit_egp:.2f} جنيه. هل تبيع الآن؟")
-            else:
-                st.warning("السعر هادئ حالياً، انتظر القنصة القادمة.")
+        for item in data:
+            symbol = item['symbol'].replace("USDT", "")
+            if item['symbol'] in targets:
+                price = float(item['lastPrice'])
+                vol = float(item['quoteVolume'])
+                change = float(item['priceChangePercent'])
+                
+                if symbol == "PEPE": my_coin_price = price
+                
+                rows.append({
+                    "العملة": symbol,
+                    "السعر": f"${price:.8f}",
+                    "الحجم": f"${vol:,.0f}",
+                    "قوة الحيتان": "🐳 ضخمة" if vol > 10000000 else "🐟 أفراد",
+                    "التوقع": "🚀 صعود" if change > 2 else "➡️ استقرار"
+                })
 
+        with placeholder.container():
+            # حسابات الـ 100 جنيه
+            val_egp = ((2.0 / buy_price) * my_coin_price) * 50 if buy_price > 0 else 100
+            diff = val_egp - 100
+            
+            # عرض النتائج
+            c1, c2, c3 = st.columns(3)
+            c1.metric("قيمة الـ 100 ج الآن", f"{val_egp:.2f} ج.م", f"{diff:.2f}")
+            c2.metric("أعلى حجم تداول", rows[0]['العملة'])
+            c3.metric("الساعة الآن", time.strftime('%H:%M:%S'))
+            
+            st.progress(min(max(diff/target_profit, 0.0), 1.0) if diff > 0 else 0.0)
+            
+            st.write("### 📊 رادار السوق الشامل")
+            st.table(pd.DataFrame(rows))
+            
     time.sleep(5)
