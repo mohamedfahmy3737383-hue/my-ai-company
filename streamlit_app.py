@@ -7,15 +7,17 @@ st.set_page_config(page_title="AI Arbitrage Radar", layout="wide")
 st.title("🚀 رادار صيد فرص المراجحة")
 
 # تعريف المنصات
-exchanges = {
-    'KuCoin': ccxt.kucoin(),
-    'Gate.io': ccxt.gateio(),
-    'Bybit': ccxt.bybit()
-}
+@st.cache_resource
+def get_exchanges():
+    return {
+        'KuCoin': ccxt.kucoin(),
+        'Gate.io': ccxt.gateio(),
+        'Bybit': ccxt.bybit()
+    }
 
+exchanges = get_exchanges()
 symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT', 'AVAX/USDT']
 
-# مكان عرض البيانات
 placeholder = st.empty()
 
 while True:
@@ -24,33 +26,42 @@ while True:
         try:
             prices = {}
             for name, ex in exchanges.items():
-                prices[name] = ex.fetch_ticker(symbol)['last']
+                ticker = ex.fetch_ticker(symbol)
+                prices[name] = ticker['last']
             
-            # حساب أعلى وأقل سعر بين المنصات
             max_p = max(prices.values())
             min_p = min(prices.values())
             diff = ((max_p - min_p) / min_p) * 100
             
             data.append({
                 "العملة": symbol,
-                "أقل سعر": min_p,
-                "أعلى سعر": max_p,
+                "أقل سعر": f"${min_p:,.2f}",
+                "أعلى سعر": f"${max_p:,.2f}",
                 "الفرق %": round(diff, 3)
             })
-        except:
+        except Exception as e:
             continue
 
-    df = pd.DataFrame(data)
+    if data:
+        df = pd.DataFrame(data)
+        with placeholder.container():
+            st.write("### 📊 لوحة الفرص اللحظية")
+            
+            # عرض العملات كـ "بطاقات" تحت بعض عشان شاشة التابلت
+            for item in data:
+                diff_val = item['الفرق %']
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    st.metric(item['العملة'], f"{diff_val}%")
+                with col2:
+                    if diff_val > 0.2:
+                        st.success(f"🔥 فرصة قوية! الفرق بين المنصات هو {diff_val}%")
+                    else:
+                        st.info("🔎 مراقبة الأسعار.. لا يوجد فرق كبير حالياً.")
+            
+            st.divider()
+            st.write("### 📝 جدول البيانات التفصيلي")
+            st.table(df)
+            st.caption(f"آخر تحديث: {time.strftime('%H:%M:%S')}")
 
-    with placeholder.container():
-        # عرض "كروت" للفرص القوية
-        cols = st.columns(len(data))
-        for i, row in df.iterrows():
-            color = "green" if row['الفرق %'] > 0.3 else "normal"
-            cols[i].metric(row['العملة'], f"{row['الفرق %']}%", delta=f"{row['الفرق %']}%", delta_color=color)
-        
-        st.write("### جدول التفاصيل اللحظي")
-        st.table(df)
-        st.write(f"آخر تحديث: {time.strftime('%H:%M:%S')}")
-
-    time.sleep(10) # تحديث كل 10 ثواني
+    time.sleep(15) # تحديث كل 15 ثانية عشان المنصات متعملش Block
