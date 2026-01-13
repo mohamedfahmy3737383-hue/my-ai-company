@@ -1,80 +1,78 @@
 import streamlit as st
 import pandas as pd
-import requests
+import yfinance as ticker
 import time
 
-# 1. إعدادات السيطرة الفولاذية
-st.set_page_config(page_title="Global Control V11", layout="wide")
+st.set_page_config(page_title="Global Empire Dashboard", layout="wide")
 
-st.title("🌐 رادار السيطرة العالمية (نسخة اختراق الحظر)")
+st.title("🏛️ إمبراطورية الـ 100 جنيه - مركز السيطرة العالمي")
+st.write("الرادار يراقب الآن: الكريبتو، الأسهم الأمريكية، والذهب")
 
-# 2. إدارة محفظة الـ 100 جنيه
-st.sidebar.title("💰 شركة الـ 100 جنيه")
-asset_name = st.sidebar.text_input("اسم عملتك (مثل CHZ أو PEPE):", value="CHZ").upper()
-buy_p = st.sidebar.number_input("سعر شرائك بالدولار ($):", value=0.000001, format="%.8f")
+# 💰 إدارة الأصول المتعددة
+st.sidebar.title("💳 محفظة الإمبراطورية")
+asset_type = st.sidebar.selectbox("نوع الأصول:", ["كريبتو", "أسهم عالمية", "معادن"])
+target_asset = st.sidebar.text_input("رمز الأصول (مثلاً AAPL أو Gold):", value="CHZ-USD").upper()
+buy_price = st.sidebar.number_input("سعر دخولك ($):", value=0.15, format="%.4f")
 
-def play_alarm():
-    st.components.v1.html("""<audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg"></audio>""", height=0)
-
-def force_fetch_data():
-    # بنجرب ندخل من "بوابات" مختلفة عشان نتخطى حظر السيرفر
-    endpoints = [
-        "https://api.coincap.io/v2/assets?limit=50",
-        "https://api.coinlore.net/api/tickers/?start=0&limit=50"
-    ]
-    for url in endpoints:
-        try:
-            r = requests.get(url, timeout=4)
-            if r.status_code == 200:
-                res = r.json()
-                return res.get('data', res)
-        except: continue
-    return None
+# القائمة العالمية الجديدة
+world_radar = {
+    'الذهب': 'GC=F',
+    'بتكوين': 'BTC-USD',
+    'تسلا': 'TSLA',
+    'إنفيدا': 'NVDA',
+    'أبل': 'AAPL',
+    'تشيليز': 'CHZ-USD',
+    'الدولار/جنيه': 'EGP=X'
+}
 
 placeholder = st.empty()
 
 while True:
-    raw_data = force_fetch_data()
-    
-    if raw_data:
-        results = []
-        for item in raw_data:
-            try:
-                # الكود ذكي بيعرف يقرأ من أي مصدر
-                sym = item.get('symbol', item.get('symbol', '??')).upper()
-                p = float(item.get('priceUsd', item.get('price_usd', 0)))
-                c = float(item.get('changePercent24Hr', item.get('percent_change_24h', 0)))
+    try:
+        # سحب بيانات السوق الشامل
+        data = ticker.download(list(world_radar.values()), period="1d", interval="1m", progress=False)['Close']
+        
+        if not data.empty:
+            results = []
+            last_p = data.iloc[-1]
+            prev_p = data.iloc[-5] if len(data) > 5 else data.iloc[0]
+            
+            for name, sym in world_radar.items():
+                curr = float(last_p[sym])
+                change = ((curr - float(prev_p[sym])) / float(prev_p[sym])) * 100
                 
                 results.append({
-                    "العملة": sym,
-                    "السعر ($)": p,
-                    "تغير %": round(c, 2),
-                    "القرار": "🚀 هجوم" if c > 4 else "📡 رصد"
+                    "الأصل": name,
+                    "الرمز": sym,
+                    "السعر الحالي": f"{curr:,.2f}$",
+                    "الحركة اللحظية %": round(change, 3),
+                    "الوضع": "🔥 انفجار" if change > 0.2 else "🟢 صعود" if change > 0 else "🔴 هبوط"
                 })
-            except: continue
 
-        df = pd.DataFrame(results)
+            df = pd.DataFrame(results)
 
-        with placeholder.container():
-            # حساب الأرباح (الـ 100 جنيه)
-            my_coin = df[df['العملة'] == asset_name]
-            if not my_coin.empty:
-                curr_p = my_coin.iloc[0]['السعر ($)']
-                val_egp = ((2.0 / buy_p) * curr_p) * 50 if buy_p > 0 else 100
-                
+            with placeholder.container():
+                # حساب قيمة الـ 100 جنيه في الإمبراطورية
+                try:
+                    live_price = ticker.Ticker(target_asset).fast_info['last_price']
+                    current_value = ((2.0 / buy_price) * live_price) * 50
+                except: current_value = 100
+
                 c1, c2, c3 = st.columns(3)
-                c1.metric(f"قيمة الـ 100ج في {asset_name}", f"{val_egp:.2f} ج.م", f"{val_egp-100:.2f}")
-                c2.metric("حالة الربط", "✅ تم الاختراق")
-                c3.metric("تحديث الرصد", time.strftime('%H:%M:%S'))
+                c1.metric("قيمة الـ 100ج الآن", f"{current_value:.2f} ج.م", f"{current_value-100:.2f}")
+                c2.metric("أقوى أصل متحرك", df.sort_values(by="الحركة اللحظية %").iloc[-1]['الأصل'])
+                c3.metric("توقيت الإمبراطورية", time.strftime('%H:%M:%S'))
 
-                if "🚀 هجوم" in df['القرار'].values:
-                    play_alarm()
-                    st.warning("🔥 رادار الحيتان رصد هجوم في السوق!")
+                st.write("---")
+                st.subheader("📊 رادار الأسواق العالمية المختلطة")
+                st.table(df)
+                
+                # نصيحة الإمبراطور
+                if "🔥 انفجار" in df['الوضع'].values:
+                    st.balloons()
+                    st.success("🚨 يا مدير! فيه فرصة تاريخية بتحصل في الأسواق دلوقتي!")
 
-            st.write("---")
-            st.subheader("📊 قائمة الفرص الحالية")
-            st.table(df.sort_values(by="تغير %", ascending=False).head(15))
-    else:
-        st.error("⚠️ جاري تدوير مفاتيح الاتصال... السيرفر يقاوم")
+    except Exception as e:
+        st.error(f"محاولة ربط الإمبراطورية بالسوق... {e}")
 
-    time.sleep(15) # وقت أطول لضمان عدم الحظر
+    time.sleep(20)
