@@ -3,86 +3,62 @@ import pandas as pd
 import requests
 import time
 
-st.set_page_config(page_title="Global Market Dominator", layout="wide")
+# 1. إعدادات السيطرة (ثبات وسرعة)
+st.set_page_config(page_title="Global Crypto Command", layout="wide")
 
-st.title("🌎 رادار السيطرة الشاملة (كافة عملات العالم)")
-st.write("الرادار يراقب الآن آلاف العملات لاصطياد أقوى الانفجارات السعرية")
+if 'prev_v' not in st.session_state: st.session_state.prev_v = {}
 
-# إدارة المحفظة
-st.sidebar.title("💰 شركة الـ 100 جنيه")
-user_asset = st.sidebar.selectbox("اختر عملتك للمتابعة:", ["PEPE", "SHIB", "DOGE", "BTC", "SOL", "LUNC"])
-buy_p = st.sidebar.number_input("سعر شراء عملتك ($):", value=0.000001, format="%.8f")
+st.title("🌐 مركز قيادة الكريبتو العالمي")
+st.write("يتم الآن مراقبة كافة العملات التي تمتلك سيولة نشطة في العالم")
 
-def get_all_world_assets():
-    # سحب بيانات الـ 2000 عملة الأوائل في العالم (تغطية شاملة)
+# 2. محفظة الـ 100 جنيه (القائد)
+st.sidebar.title("💰 إدارة الأرباح")
+target_asset = st.sidebar.text_input("العملة التي تملكها (مثال: PEPE):", value="PEPE").upper()
+buy_p = st.sidebar.number_input("سعر شرائك بالدولار ($):", value=0.000001, format="%.8f")
+
+def get_fast_global_data():
+    # استخدام بوابة بيانات مجمعة وسريعة جداً
     try:
-        url = "https://api.coincap.io/v2/assets?limit=2000"
-        r = requests.get(url, timeout=10)
+        url = "https://api.coincap.io/v2/assets?limit=300" # ركزنا على أول 300 عملة (العمود الفقري للسوق)
+        r = requests.get(url, timeout=5)
         if r.status_code == 200:
             return r.json().get('data', [])
     except:
         return None
-    return None
 
 placeholder = st.empty()
 
 while True:
-    all_data = get_all_world_assets()
+    data = get_fast_global_data()
     
-    if all_data:
+    if data:
         results = []
-        for item in all_data:
+        for item in data:
             try:
+                sym = item.get('symbol')
                 p = float(item.get('priceUsd', 0))
                 c = float(item.get('changePercent24Hr', 0))
                 v = float(item.get('volumeUsd24Hr', 0))
-                sym = item.get('symbol')
+                
+                # حساب تدفق الحيتان اللحظي
+                old_v = st.session_state.prev_v.get(sym, v)
+                flow = v - old_v
+                st.session_state.prev_v[sym] = v
                 
                 results.append({
-                    "الترتيب": int(item.get('rank')),
                     "العملة": sym,
-                    "الاسم": item.get('name'),
                     "السعر ($)": p,
-                    "تغير %": round(c, 2),
-                    "السيولة (24س)": v,
-                    "القرار": "🚀 انفجار" if c > 15 else "🔥 صعود قوي" if c > 7 else "📡 مستقر"
+                    "تغير% (24س)": round(c, 2),
+                    "تدفق السيولة": flow,
+                    "نشاط الحيتان": "🐳 حوت ضخم" if flow > 50000 else "🐟 أفراد",
+                    "القرار": "🚀 هجوم" if c > 10 or flow > 100000 else "📡 مراقبة"
                 })
             except: continue
 
-        df_all = pd.DataFrame(results)
+        df = pd.DataFrame(results)
 
         with placeholder.container():
-            # 1. قسم الانفجارات اللحظية (أعلى 5 عملات في العالم حالياً)
-            st.subheader("⚠️ أكبر انفجارات في العالم الآن")
-            top_explosions = df_all.sort_values(by="تغير %", ascending=False).head(5)
-            cols = st.columns(5)
-            for i, (index, row) in enumerate(top_explosions.iterrows()):
-                cols[i].metric(row['العملة'], f"${row['السعر ($)']:.4f}", f"{row['تغير %']}%")
-
-            st.write("---")
-
-            # 2. حسابات الـ 100 جنيه للعملة المختارة
-            my_coin = df_all[df_all['العملة'] == user_asset].iloc[0] if user_asset in df_all['العملة'].values else results[0]
-            val_egp = ((2.0 / buy_p) * my_coin['السعر ($)']) * 50 if buy_p > 0 else 100
-            
-            c1, c2, c3 = st.columns(3)
-            c1.metric(f"قيمة الـ 100ج في {user_asset}", f"{val_egp:.2f} ج.م", f"{val_egp-100:.2f}")
-            c2.metric("إجمالي العملات المراقبة", f"{len(df_all)}")
-            c3.metric("توقيت السيطرة", time.strftime('%H:%M:%S'))
-
-            # 3. جدول السيطرة الشامل (قابل للبحث والترتيب)
-            st.subheader("📊 قائمة العملات العالمية (رتب حسب التغير أو السيولة)")
-            
-            # فلتر سريع للبحث
-            search = st.text_input("🔍 ابحث عن أي عملة في العالم (مثلاً: BONK, FLOKI, BTC):")
-            if search:
-                display_df = df_all[df_all['العملة'].str.contains(search.upper())]
-            else:
-                display_df = df_all.head(100) # عرض أول 100 عملة افتراضياً للسرعة
-
-            st.dataframe(display_df.style.highlight_max(axis=0, subset=['تغير %']), use_container_width=True)
-
-    else:
-        st.warning("🔄 الرادار يقوم بمسح آلاف العملات الآن... انتظر ثواني")
-
-    time.sleep(15) # تحديث كل 15 ثانية لمواكبة حجم البيانات الضخم
+            # حسابات الـ 100 جنيه
+            my_coin_row = df[df['العملة'] == target_asset]
+            if not my_coin_row.empty:
+                curr_
