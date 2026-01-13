@@ -3,23 +3,10 @@ import pandas as pd
 import requests
 import time
 
-# 1. إعدادات الصفحة والجماليات
-st.set_page_config(page_title="AI Mega Radar 🚀", layout="wide")
+st.set_page_config(page_title="Real Profit Sniper 💰", layout="wide")
 
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    .stMetric { border: 1px solid #4b5563; padding: 10px; border-radius: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# 2. المحفظة الشخصية (الـ 100 جنيه)
-st.sidebar.title("💰 محفظة الـ 100 جنيه")
-buy_price = st.sidebar.number_input("سعر شراء عملتك (بالدولار):", value=0.000001, format="%.8f")
-target_profit = st.sidebar.slider("هدفك الربحي (بالجنيه):", 1, 100, 20)
-
-st.title("🎯 رادار القنص الموحد - نسخة الاستعادة")
-st.write("تم استعادة نظام مراقبة الحيتان وإدارة الـ 100 جنيه")
+st.title("💰 رادار المكسب الحقيقي (إصدار القناص)")
+st.write("الهدف: تحويل الـ 100 جنيه لأرباح حقيقية من خلال قنص السيولة")
 
 def get_data():
     url = "https://api.mexc.com/api/v3/ticker/24hr"
@@ -31,41 +18,51 @@ placeholder = st.empty()
 while True:
     data = get_data()
     if data:
-        targets = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT']
+        # العملات الأكثر ربحية للرأس المال الصغير
+        targets = ['PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT', 'LUNCUSDT', 'XRPUSDT', 'SOLUSDT']
         rows = []
-        my_coin_price = 0
         
         for item in data:
-            symbol = item['symbol'].replace("USDT", "")
             if item['symbol'] in targets:
                 price = float(item['lastPrice'])
                 vol = float(item['quoteVolume'])
                 change = float(item['priceChangePercent'])
                 
-                if symbol == "PEPE": my_coin_price = price
-                
+                # معادلة المكسب الحقيقي
+                if change > 1 and vol > 5000000:
+                    signal = "🔥 اشتري الآن (فرصة مكسب)"
+                elif change < -2:
+                    signal = "⚠️ خطر (هروب السيولة)"
+                else:
+                    signal = "⏳ انتظر إشارة"
+
                 rows.append({
-                    "العملة": symbol,
-                    "السعر": f"${price:.8f}",
-                    "الحجم": f"${vol:,.0f}",
-                    "قوة الحيتان": "🐳 ضخمة" if vol > 10000000 else "🐟 أفراد",
-                    "التوقع": "🚀 صعود" if change > 2 else "➡️ استقرار"
+                    "العملة": item['symbol'].replace("USDT", ""),
+                    "السعر الحالي": f"${price:.8f}",
+                    "حركة 24س": f"{change}%",
+                    "السيولة ($)": f"{vol:,.0f}",
+                    "الإشارة": signal
                 })
 
         with placeholder.container():
-            # حسابات الـ 100 جنيه
-            val_egp = ((2.0 / buy_price) * my_coin_price) * 50 if buy_price > 0 else 100
-            diff = val_egp - 100
+            # عرض أقوى فرصة في كارت كبير
+            best_opportunity = max(rows, key=lambda x: float(x['حركة 24س'].replace('%','')))
             
-            # عرض النتائج
-            c1, c2, c3 = st.columns(3)
-            c1.metric("قيمة الـ 100 ج الآن", f"{val_egp:.2f} ج.م", f"{diff:.2f}")
-            c2.metric("أعلى حجم تداول", rows[0]['العملة'])
-            c3.metric("الساعة الآن", time.strftime('%H:%M:%S'))
+            c1, c2 = st.columns([2, 1])
+            with c1:
+                st.markdown(f"""
+                <div style="background-color:#1b4d3e; padding:20px; border-radius:15px; text-align:center">
+                    <h2 style="color:white">أقوى فرصة للمكسب الآن: {best_opportunity['العملة']}</h2>
+                    <h1 style="color:#00ff00">{best_opportunity['الإشارة']}</h1>
+                </div>
+                """, unsafe_allow_html=True)
             
-            st.progress(min(max(diff/target_profit, 0.0), 1.0) if diff > 0 else 0.0)
-            
-            st.write("### 📊 رادار السوق الشامل")
-            st.table(pd.DataFrame(rows))
-            
+            with c2:
+                st.metric("تحديث الرادار", time.strftime('%H:%M:%S'))
+                st.write("نصيحة: لا تدخل الصفقة إلا لو الإشارة 'اشتري الآن' والسيولة فوق 5 مليون.")
+
+            st.write("---")
+            df = pd.DataFrame(rows)
+            st.table(df)
+
     time.sleep(5)
