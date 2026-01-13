@@ -1,77 +1,67 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
+import requests
 import time
+import hmac
+import hashlib
 
-st.set_page_config(page_title="AI Arbitrage Pro", layout="wide")
+# إعدادات الصفحة
+st.set_page_config(page_title="MEXC AI Hunter", layout="wide")
 
-# تصميم الواجهة بشكل احترافي
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    .stMetric { background-color: #1f2937; padding: 15px; border-radius: 10px; border: 1px solid #374151; }
-    </style>
-    """, unsafe_allow_html=True)
+# جلب المفاتيح من الـ Secrets بأمان
+try:
+    access_key = st.secrets["MEXC_ACCESS_KEY"]
+    secret_key = st.secrets["MEXC_SECRET_KEY"]
+except:
+    st.error("⚠️ خطأ: المفاتيح غير موجودة في Secrets!")
+    st.stop()
 
-st.title("🎯 صائد فرص المراجحة الذكي")
-st.write("الرادار يقوم الآن بمسح السوق العالمي وحساب العمولات")
+def get_mexc_ticker():
+    # جلب أسعار المنصة اللحظية (عمومي)
+    url = "https://api.mexc.com/api/v3/ticker/bookTicker"
+    return requests.get(url).json()
 
-symbols = {
-    'Bitcoin': 'BTC-USD',
-    'Ethereum': 'ETH-USD',
-    'Solana': 'SOL-USD',
-    'Ripple': 'XRP-USD',
-    'Cardano': 'ADA-USD'
-}
+st.title("🏹 رادار قنص MEXC المطور")
+st.markdown("---")
 
 placeholder = st.empty()
 
 while True:
-    all_data = []
-    with st.spinner('جاري تحليل موجات السوق...'):
-        for name, ticker in symbols.items():
-            try:
-                crypto = yf.Ticker(ticker)
-                info = crypto.fast_info
-                current_price = info['lastPrice']
-                high_24h = info['dayHigh']
-                low_24h = info['dayLow']
-                
-                # حساب فرق السعر الافتراضي (بين أقل وأعلى سعر اليوم)
-                diff = ((high_24h - low_24h) / low_24h) * 100
-                
-                # حساب صافي الربح بعد عمولة افتراضية 0.2%
-                net_profit = diff - 0.2
-                
-                all_data.append({
-                    "العملة": name,
-                    "السعر الحالي": f"${current_price:,.2f}",
-                    "تذبذب اليوم": f"{diff:.2f}%",
-                    "الربح المتوقع": f"{net_profit:.2f}%",
-                    "الحالة": "🔥 فرصة قوية" if net_profit > 1.5 else "⏳ مراقبة"
-                })
-            except:
-                continue
-
-    if all_data:
-        with placeholder.container():
-            # عرض كروت سريعة فوق
-            cols = st.columns(len(all_data))
-            for i, item in enumerate(all_data):
-                color = "normal" if "مراقبة" in item['الحالة'] else "inverse"
-                cols[i].metric(item['العملة'], item['السعر الحالي'], item['الربح المتوقع'], delta_color=color)
-            
-            st.divider()
-            
-            # عرض الجدول الملون
-            df = pd.DataFrame(all_data)
-            def color_status(val):
-                color = '#155724' if 'فرصة' in val else '#721c24'
-                return f'background-color: {color}; color: white'
-            
-            st.write("### 🔍 تفاصيل الفرص المكتشفة")
-            st.table(df.style.applymap(color_status, subset=['الحالة']))
-            
-            st.caption(f"تحديث تلقائي كل 10 ثوانٍ | التوقيت الحالي: {time.strftime('%H:%M:%S')}")
+    tickers = get_mexc_ticker()
     
-    time.sleep(10)
+    if tickers:
+        data = []
+        # أهم عملات بنراقبها
+        targets = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'ADAUSDT', 'XRPUSDT', 'LTCUSDT']
+        
+        for t in tickers:
+            if t['symbol'] in targets:
+                bid = float(t['bidPrice'])
+                ask = float(t['askPrice'])
+                # حساب الفارق الربحي (Spread)
+                spread = ((ask - bid) / bid) * 100
+                
+                data.append({
+                    "العملة": t['symbol'],
+                    "أفضل شراء (Bid)": f"${bid:,.4f}",
+                    "أفضل بيع (Ask)": f"${ask:,.4f}",
+                    "الفارق الربحي %": round(spread, 4),
+                    "صافي الربح (بعد العمولة)": f"{round(spread - 0.2, 4)}%"
+                })
+        
+        with placeholder.container():
+            # عرض كروت إحصائية
+            c1, c2, c3 = st.columns(3)
+            c1.metric("حالة الـ API", "✅ متصل")
+            c2.metric("تحديث", time.strftime('%H:%M:%S'))
+            c3.metric("المنصة", "MEXC Global")
+            
+            # عرض الجدول
+            df = pd.DataFrame(data)
+            st.dataframe(df.style.highlight_max(axis=0, subset=['الفارق الربحي %'], color='#1b4d3e'), use_container_width=True)
+            
+            # تنبيه لو فيه فرصة قوية
+            if any(float(row['الفارق الربحي %']) > 0.05 for row in data):
+                st.success("🔥 اكتشاف فجوة سعرية! راقب الجدول")
+    
+    time.sleep(3) # تحديث سريع جداً كل 3 ثواني
