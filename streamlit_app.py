@@ -3,62 +3,80 @@ import pandas as pd
 import requests
 import time
 
-# 1. إعدادات السيطرة (ثبات وسرعة)
-st.set_page_config(page_title="Global Crypto Command", layout="wide")
+# 1. إعدادات السيطرة
+st.set_page_config(page_title="Global Command Final", layout="wide")
 
 if 'prev_v' not in st.session_state: st.session_state.prev_v = {}
 
-st.title("🌐 مركز قيادة الكريبتو العالمي")
-st.write("يتم الآن مراقبة كافة العملات التي تمتلك سيولة نشطة في العالم")
+st.title("🌐 رادار السيطرة العالمية (نسخة اختراق الحجب)")
 
-# 2. محفظة الـ 100 جنيه (القائد)
-st.sidebar.title("💰 إدارة الأرباح")
-target_asset = st.sidebar.text_input("العملة التي تملكها (مثال: PEPE):", value="PEPE").upper()
+# 2. محفظة الـ 100 جنيه
+st.sidebar.title("💰 محفظة الـ 100 جنيه")
+asset_name = st.sidebar.text_input("اسم عملتك (مثل PEPE):", value="PEPE").upper()
 buy_p = st.sidebar.number_input("سعر شرائك بالدولار ($):", value=0.000001, format="%.8f")
 
-def get_fast_global_data():
-    # استخدام بوابة بيانات مجمعة وسريعة جداً
-    try:
-        url = "https://api.coincap.io/v2/assets?limit=300" # ركزنا على أول 300 عملة (العمود الفقري للسوق)
-        r = requests.get(url, timeout=5)
-        if r.status_code == 200:
-            return r.json().get('data', [])
-    except:
-        return None
+# 3. دالة جلب البيانات "المصفحة"
+def get_data_no_matter_what():
+    # بنجرب 3 بوابات مختلفة، لو واحدة مقفولة التانية تفتح
+    urls = [
+        "https://api.coincap.io/v2/assets?limit=100",
+        "https://api.coinlore.net/api/tickers/",
+        "https://api.binance.com/api/v3/ticker/24hr"
+    ]
+    for url in urls:
+        try:
+            r = requests.get(url, timeout=5)
+            if r.status_code == 200:
+                d = r.json()
+                # تنسيق البيانات حسب المصدر اللي رد
+                if 'data' in d: return d['data']
+                return d
+        except: continue
+    return None
 
 placeholder = st.empty()
 
 while True:
-    data = get_fast_global_data()
+    raw = get_data_no_matter_what()
     
-    if data:
+    if raw:
         results = []
-        for item in data:
+        for item in raw:
             try:
-                sym = item.get('symbol')
-                p = float(item.get('priceUsd', 0))
-                c = float(item.get('changePercent24Hr', 0))
-                v = float(item.get('volumeUsd24Hr', 0))
-                
-                # حساب تدفق الحيتان اللحظي
-                old_v = st.session_state.prev_v.get(sym, v)
-                flow = v - old_v
-                st.session_state.prev_v[sym] = v
+                # محاولة قراءة البيانات بمرونة (لأن كل موقع له أسامي مختلفة)
+                sym = item.get('symbol', item.get('symbol', '??')).upper()
+                p = float(item.get('priceUsd', item.get('price_usd', item.get('lastPrice', 0))))
+                c = float(item.get('changePercent24Hr', item.get('percent_change_24h', item.get('priceChangePercent', 0))))
+                v = float(item.get('volumeUsd24Hr', item.get('volume24', item.get('quoteVolume', 0))))
                 
                 results.append({
                     "العملة": sym,
                     "السعر ($)": p,
-                    "تغير% (24س)": round(c, 2),
-                    "تدفق السيولة": flow,
-                    "نشاط الحيتان": "🐳 حوت ضخم" if flow > 50000 else "🐟 أفراد",
-                    "القرار": "🚀 هجوم" if c > 10 or flow > 100000 else "📡 مراقبة"
+                    "تغير %": round(c, 2),
+                    "السيولة": v,
+                    "القرار": "🚀 هجوم" if c > 5 else "📡 مراقبة"
                 })
             except: continue
 
         df = pd.DataFrame(results)
 
         with placeholder.container():
-            # حسابات الـ 100 جنيه
-            my_coin_row = df[df['العملة'] == target_asset]
-            if not my_coin_row.empty:
-                curr_
+            # حساب الأرباح
+            my_coin = df[df['العملة'] == asset_name]
+            if not my_coin.empty:
+                curr_p = my_coin.iloc[0]['السعر ($)']
+                val_egp = ((2.0 / buy_p) * curr_p) * 50 if buy_p > 0 else 100
+                
+                c1, c2, c3 = st.columns(3)
+                c1.metric(f"قيمة الـ 100ج في {asset_name}", f"{val_egp:.2f} ج.م", f"{val_egp-100:.2f}")
+                c2.metric("حالة السوق", "🔥 نشط" if c > 0 else "❄️ هادئ")
+                c3.metric("آخر تحديث", time.strftime('%H:%M:%S'))
+
+            st.write("---")
+            st.subheader("📊 أقوى 15 عملة في العالم حالياً")
+            st.table(df.sort_values(by="تغير %", ascending=False).head(15))
+            
+    else:
+        st.error("⚠️ السيرفر محجوب مؤقتاً.. سأقوم بالمحاولة مرة أخرى خلال ثوانٍ")
+
+    time.sleep(12)
