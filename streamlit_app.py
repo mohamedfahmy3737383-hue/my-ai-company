@@ -3,71 +3,63 @@ import pandas as pd
 import requests
 import time
 
-st.set_page_config(page_title="Big Vision Radar 🚀", layout="wide")
+st.set_page_config(page_title="Whale Hunter Radar 🐋", layout="wide")
 
-# كود الصوت
-def play_sound():
-    sound_html = """<audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg"></audio>"""
-    st.components.v1.html(sound_html, height=0)
-
-st.title("📈 شركة القنص الذكي - رادار العملات الواعدة")
-st.write("رأس المال المستهدف: 100 جنيه مصري (حوالي $2.00)")
-
-def get_mexc_data():
-    url = "https://api.mexc.com/api/v3/ticker/bookTicker"
+def get_mexc_stats():
+    # جلب بيانات الأسعار والحجم معاً
+    url = "https://api.mexc.com/api/v3/ticker/24hr"
     try: return requests.get(url, timeout=5).json()
     except: return None
+
+st.title("🐋 رادار كشف الحيتان والعملات الرخيصة")
+st.write("رأس المال: 100 جنيه | الهدف: قنص السيولة العالية")
 
 placeholder = st.empty()
 
 while True:
-    raw_data = get_data = get_mexc_data()
-    if raw_data:
-        # إضافة عملات رخيصة جداً وحركتها سريعة
-        targets = [
-            'BTCUSDT', 'ETHUSDT', 'SOLUSDT', # الكبار
-            'PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT', 'LUNCUSDT', # عملات رخيصة (تراب فلوس)
-            'GALAUSDT', 'VETUSDT', 'CHZUSDT' # عملات مشاريع قوية ورخيصة
-        ]
-        
+    stats_data = get_mexc_stats()
+    if stats_data:
+        targets = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT', 'LUNCUSDT', 'GALAUSDT']
         final_list = []
-        for item in raw_data:
+
+        for item in stats_data:
             if item['symbol'] in targets:
-                bid = float(item['bidPrice'])
-                ask = float(item['askPrice'])
-                spread = ((ask - bid) / bid) * 100
-                net = spread - 0.2
+                price = float(item['lastPrice'])
+                volume = float(item['quoteVolume']) # حجم التداول بالدولار
+                change = float(item['priceChangePercent'])
                 
-                # حساب الكمية اللي تشتريها بـ 100 جنيه (بافتراض الدولار بـ 50 جنيه)
-                capital_usd = 2.0 
-                quantity = capital_usd / ask if ask > 0 else 0
-                
+                # تصنيف قوة الحيتان
+                if volume > 10000000: whale_status = "🐳 حيتان ضخمة"
+                elif volume > 1000000: whale_status = "🐬 حركة قوية"
+                else: whale_status = "🐟 حركة هادئة"
+
                 final_list.append({
                     "العملة": item['symbol'].replace("USDT", ""),
-                    "السعر": f"${ask:.8f}", # عرض 8 أرقام بعد العلامة عشان العملات الرخيصة
-                    "صافي الربح %": round(net, 3),
-                    "كمية بـ 100 ج": f"{quantity:,.0f} قطعة",
-                    "الحالة": "💎 صيد ثمين" if net > 0.01 else "⏳ مراقبة"
+                    "السعر الحالي": f"${price:.8f}",
+                    "تغير 24س": f"{change}%",
+                    "السيولة ($)": f"${volume:,.0f}",
+                    "قوة الحيتان": whale_status
                 })
 
         with placeholder.container():
             df = pd.DataFrame(final_list)
             
-            # كروت الشركة
-            c1, c2, c3 = st.columns(3)
-            c1.metric("عدد العملات تحت المراقبة", len(final_list))
-            c2.metric("قوة السوق", "متذبذب (ممتاز للمراجحة)" if any(df['صافي الربح %'] > 0) else "هادئ")
-            c3.metric("رأس المال", "100 EGP")
+            # كروت ملخصة
+            c1, c2 = st.columns(2)
+            top_vol = df.loc[df['السيولة ($)'].replace('$', '').replace(',', '', regex=True).astype(float).idxmax()]
+            c1.metric("أعلى سيولة الآن", top_vol['العملة'], top_vol['السيولة ($)'])
+            c2.metric("توقيت الرادار", time.strftime('%H:%M:%S'))
 
-            st.write("### 🔍 رادار العملات الرخيصة والفرص")
+            st.write("### 📊 جدول المراقبة ودخول السيولة")
             
-            def color_strategy(val):
-                if "💎" in val: return 'background-color: #004d40; color: white'
+            def color_whale(val):
+                if "🐳" in val: return 'background-color: #0d47a1; color: white'
+                if "🐬" in val: return 'background-color: #00838f; color: white'
                 return ''
 
-            st.table(df.style.applymap(color_strategy, subset=['الحالة']))
+            st.table(df.style.applymap(color_whale, subset=['قوة الحيتان']))
             
-            if any("💎" in x for x in df['الحالة']):
-                play_sound()
+            if "🐳" in df['قوة الحيتان'].values:
+                st.toast("انتباه: حيتان تتحرك في السوق الآن!", icon="🚨")
 
-    time.sleep(5)
+    time.sleep(10)
