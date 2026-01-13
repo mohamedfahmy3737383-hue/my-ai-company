@@ -3,108 +3,76 @@ import pandas as pd
 import requests
 import time
 
-# 1. إعدادات السيطرة العالمية
-st.set_page_config(page_title="Global Control Center V4", layout="wide")
+# إعدادات السيطرة الفورية - نسخة خفيفة جداً
+st.set_page_config(page_title="Global Sniper V5", layout="wide")
 
-# تهيئة الذاكرة
-if 'prev_vol' not in st.session_state: st.session_state.prev_vol = {}
-if 'last_signals' not in st.session_state: st.session_state.last_signals = {}
+st.title("🏹 رادار السيطرة العالمية (النسخة السريعة)")
 
-def play_alert():
-    st.components.v1.html("""<audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" type="audio/mpeg"></audio>""", height=0)
+# إدارة الـ 100 جنيه
+st.sidebar.title("💰 الشركة")
+buy_p = st.sidebar.number_input("سعر شراء عملتك ($):", value=0.000001, format="%.8f")
 
-# 2. إدارة المحفظة (الـ 100 جنيه) في الجانب
-st.sidebar.title("💰 محفظة الـ 100 جنيه")
-buy_price = st.sidebar.number_input("سعر شراء عملتك ($):", value=0.000001, format="%.8f")
-target_profit = st.sidebar.slider("الهدف فوق الـ 100 (ج):", 1, 200, 50)
-
-st.title("🌐 رادار السيطرة الشاملة (أخبار + حيتان + أرباح)")
-
-def fetch_safe_data():
+# دالة سحب البيانات مع حماية من التهنيج
+def get_market_data():
     try:
-        # سحب بيانات من Binance API (الأكثر استقراراً للعالم)
-        response = requests.get("https://api.binance.com/api/v3/ticker/24hr", timeout=10)
-        if response.status_code == 200:
-            return response.json()
-    except Exception as e:
-        st.error(f"خطأ في الاتصال بالسوق: {e}")
-    return None
+        url = "https://api.binance.com/api/v3/ticker/24hr"
+        r = requests.get(url, timeout=2)
+        return r.json()
+    except:
+        return None
 
+# مكان عرض البيانات
 placeholder = st.empty()
 
+# الذاكرة اللحظية
+if 'prev_v' not in st.session_state:
+    st.session_state.prev_v = {}
+
+# حلقة العمل (بسيطة ومباشرة)
 while True:
-    data = fetch_safe_data()
-    if data and isinstance(data, list):
-        # القائمة الكاملة للسيطرة
-        targets = [
-            'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'PEPEUSDT', 
-            'SHIBUSDT', 'BONKUSDT', 'FLOKIUSDT', 'LUNCUSDT', '1000SATSUSDT', 
-            'RATSUSDT', 'TURBOUSDT', 'BOMEUSDT', 'DOGEUSDT'
-        ]
-        
+    data = get_market_data()
+    
+    if data:
+        # أهم العملات اللي بتتحرك في العالم
+        targets = ['BTCUSDT', 'SOLUSDT', 'XRPUSDT', 'PEPEUSDT', 'SHIBUSDT', 'BONKUSDT', 'FLOKIUSDT', '1000SATSUSDT', 'LUNCUSDT', 'DOGEUSDT']
         results = []
-        current_time = time.time()
         
         for item in data:
-            # التأكد من أن البيانات تحتوي على المفاتيح المطلوبة لمنع الـ TypeError
-            if isinstance(item, dict) and 'symbol' in item and item['symbol'] in targets:
-                symbol = item['symbol']
-                price = float(item.get('lastPrice', 0))
-                change = float(item.get('priceChangePercent', 0))
-                vol_usd = float(item.get('quoteVolume', 0))
+            sym = item.get('symbol')
+            if sym in targets:
+                p = float(item['lastPrice'])
+                c = float(item['priceChangePercent'])
+                v = float(item['quoteVolume'])
                 
-                # 1. رادار السيولة اللحظية
-                prev_v = st.session_state.prev_vol.get(symbol, vol_usd)
-                money_flow = vol_usd - prev_v
-                st.session_state.prev_vol[symbol] = vol_usd
+                # حساب تدفق السيولة
+                old_v = st.session_state.prev_v.get(sym, v)
+                flow = v - old_v
+                st.session_state.prev_v[sym] = v
                 
-                # 2. كاشف الحيتان و الأخبار
-                whale_action = "🐳 حوت ضخم" if money_flow > 100000 else "🐟 تجميع" if money_flow > 5000 else "💤 هدوء"
-                news = "🔥 انفجار إخباري" if change > 8 else "📈 زخم عالمي" if change > 2 else "📰 مستقر"
-                
-                # 3. قوة السيطرة
-                power_score = (change * 5) + (money_flow / 5000)
-                
-                if power_score > 35:
-                    st.session_state.last_signals[symbol] = current_time
-                    play_alert()
-                
-                is_active = symbol in st.session_state.last_signals and (current_time - st.session_state.last_signals[symbol] < 60)
-
+                # إضافة الأخبار ونشاط الحيتان بشكل مختصر
                 results.append({
-                    "العملة": symbol.replace("USDT", ""),
-                    "السعر ($)": f"{price:.8f}" if price < 1 else f"{price:,.2f}",
-                    "تغير %": f"{change}%",
-                    "سيولة دخلت ($)": f"{money_flow:,.0f}",
-                    "الحيتان": whale_action,
-                    "الأخبار": news,
-                    "القوة": round(power_score, 1),
-                    "الأمر": "🚀 هجوم" if is_active else "📡 مراقبة"
+                    "العملة": sym.replace("USDT",""),
+                    "السعر": f"{p:.8f}" if p < 1 else f"{p:,.2f}",
+                    "تغير%": c,
+                    "سيولة دخلت": round(flow, 2),
+                    "الحالة": "🚀 هجوم حيتان" if flow > 50000 else "📡 مراقبة"
                 })
+        
+        with placeholder.container():
+            # حساب الأرباح (الـ 100 جنيه)
+            # نأخذ PEPE كمرجع للسرعة
+            ref_coin = next((x for x in results if x['العملة'] == "PEPE"), results[0])
+            curr_ref_p = float(ref_coin['السعر'].replace(',',''))
+            val_egp = ((2.0 / buy_p) * curr_ref_p) * 50 if buy_p > 0 else 100
+            
+            # عرض عدادات السيطرة
+            col1, col2, col3 = st.columns(3)
+            col1.metric("قيمة الـ 100ج الآن", f"{val_egp:.2f} ج.م", f"{val_egp-100:.2f}")
+            col2.metric("أقوى حركة عالمية", f"{max([x['تغير%'] for x in results])}%")
+            col3.metric("نبض السيرفر", time.strftime('%H:%M:%S'))
 
-        if results:
-            with placeholder.container():
-                # حسابات الـ 100 جنيه
-                # نأخذ سعر PEPE كمثال للحساب إذا كانت موجودة، وإلا نأخذ أول عملة
-                pepe_data = next((r for r in results if r['العملة'] == "PEPE"), results[0])
-                curr_p_float = float(pepe_data['السعر ($)'].replace(',', ''))
-                val_egp = ((2.0 / buy_price) * curr_p_float) * 50 if buy_price > 0 else 100
-                
-                c1, c2, c3 = st.columns(3)
-                c1.metric("قيمة الـ 100 ج الآن", f"{val_egp:.2f} ج.م", f"{val_egp-100:.2f}")
-                c2.metric("إجمالي السيولة", f"${sum([float(x['سيولة دخلت ($)'].replace(',','')) for x in results]):,.0f}")
-                c3.metric("توقيت السيطرة", time.strftime('%H:%M:%S'))
-
-                st.write("---")
-                # عرض الجدول الموحد
-                df = pd.DataFrame(results).sort_values(by="القوة", ascending=False)
-                
-                def style_rows(row):
-                    if row['الأمر'] == "🚀 هجوم": return ['background-color: #4c0000'] * len(row)
-                    if row['الحيتان'] == "🐳 حوت ضخم": return ['background-color: #002b36'] * len(row)
-                    return [''] * len(row)
-
-                st.table(df.style.apply(style_rows, axis=1))
-                st.info(f"📢 الرادار يراقب الآن {len(targets)} سوقاً عالمياً في نفس اللحظة.")
-
-    time.sleep(5)
+            # الجدول الذكي
+            df = pd.DataFrame(results).sort_values(by="تغير%", ascending=False)
+            st.table(df) # table أضمن في التحميل من dataframe لما السيرفر يكون تقيل
+            
+    time.sleep(7) # زودنا الوقت لـ 7 ثواني عشان السيرفر "يرتاح"
