@@ -3,65 +3,66 @@ import ccxt
 import pandas as pd
 import time
 
+# إعداد الصفحة
 st.set_page_config(page_title="AI Arbitrage Radar", layout="wide")
 st.title("🚀 رادار صيد فرص المراجحة")
 
-# تعريف المنصات
+# تفعيل الربط مع المنصات
 @st.cache_resource
-def get_exchanges():
+def init_exchanges():
     return {
         'KuCoin': ccxt.kucoin(),
         'Gate.io': ccxt.gateio(),
         'Bybit': ccxt.bybit()
     }
 
-exchanges = get_exchanges()
-symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT', 'AVAX/USDT']
+exchanges = init_exchanges()
+symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT']
 
 placeholder = st.empty()
 
 while True:
-    data = []
-    for symbol in symbols:
-        try:
-            prices = {}
-            for name, ex in exchanges.items():
-                ticker = ex.fetch_ticker(symbol)
-                prices[name] = ticker['last']
-            
-            max_p = max(prices.values())
-            min_p = min(prices.values())
-            diff = ((max_p - min_p) / min_p) * 100
-            
-            data.append({
-                "العملة": symbol,
-                "أقل سعر": f"${min_p:,.2f}",
-                "أعلى سعر": f"${max_p:,.2f}",
-                "الفرق %": round(diff, 3)
-            })
-        except Exception as e:
-            continue
+    all_data = []
+    
+    # رسالة تحميل بسيطة
+    with st.spinner('جاري صيد الأسعار من المنصات...'):
+        for symbol in symbols:
+            try:
+                prices = {}
+                for name, ex in exchanges.items():
+                    ticker = ex.fetch_ticker(symbol)
+                    prices[name] = ticker['last']
+                
+                min_p = min(prices.values())
+                max_p = max(prices.values())
+                diff = ((max_p - min_p) / min_p) * 100
+                
+                all_data.append({
+                    "العملة": symbol,
+                    "أقل سعر": min_p,
+                    "أعلى سعر": max_p,
+                    "الفرق %": round(diff, 3)
+                })
+            except:
+                continue
 
-    if data:
-        df = pd.DataFrame(data)
+    # التأكد من وجود بيانات قبل الرسم لتجنب الخطأ اللي ظهرلك
+    if len(all_data) > 0:
+        df = pd.DataFrame(all_data)
         with placeholder.container():
-            st.write("### 📊 لوحة الفرص اللحظية")
+            st.write("### 📊 الأسعار اللحظية")
             
-            # عرض العملات كـ "بطاقات" تحت بعض عشان شاشة التابلت
-            for item in data:
-                diff_val = item['الفرق %']
-                col1, col2 = st.columns([1, 3])
-                with col1:
-                    st.metric(item['العملة'], f"{diff_val}%")
-                with col2:
-                    if diff_val > 0.2:
-                        st.success(f"🔥 فرصة قوية! الفرق بين المنصات هو {diff_val}%")
-                    else:
-                        st.info("🔎 مراقبة الأسعار.. لا يوجد فرق كبير حالياً.")
+            # عرض كل عملة في سطر منفصل (أضمن للتابلت وللكود)
+            for _, row in df.iterrows():
+                with st.expander(f"💰 {row['العملة']} - الفرق الحالي: {row['الفرق %']}%", expanded=True):
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("أقل سعر", f"${row['أقل سعر']:,.2f}")
+                    c2.metric("أعلى سعر", f"${row['أعلى سعر']:,.2f}")
+                    c3.metric("الربح المتوقع", f"{row['الفرق %']}%")
             
             st.divider()
-            st.write("### 📝 جدول البيانات التفصيلي")
-            st.table(df)
-            st.caption(f"آخر تحديث: {time.strftime('%H:%M:%S')}")
+            st.caption(f"آخر تحديث للسيرفر: {time.strftime('%H:%M:%S')}")
+    else:
+        st.warning("⚠️ لم يتمكن الموظف الـ AI من سحب البيانات حالياً.. سيحاول مجدداً خلال ثواني.")
 
-    time.sleep(15) # تحديث كل 15 ثانية عشان المنصات متعملش Block
+    time.sleep(20) # راحة للسيرفر
