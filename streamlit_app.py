@@ -3,12 +3,19 @@ import pandas as pd
 import requests
 import time
 
-st.set_page_config(page_title="Opportunity Seeker PRO", layout="wide")
+st.set_page_config(page_title="Liquidity Hunter Pro", layout="wide")
 
-st.title("🏹 رادار قنص الفرص النادرة")
-st.write("الرادار الآن يبحث في 'أعماق السوق' عن أي حركة مخفية للـ 100 جنيه")
+# مخزن لحفظ السيولة السابقة للمقارنة
+if 'prev_vol' not in st.session_state:
+    st.session_state.prev_vol = {}
 
-def fetch_all():
+def play_alert():
+    st.components.v1.html("""<audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" type="audio/mpeg"></audio>""", height=0)
+
+st.title("🌊 رادار تدفق السيولة (صيد الحيتان قبل الانطلاق)")
+st.write("الرادار يراقب الآن: كم دولاراً دخل في كل عملة خلال الـ 60 ثانية الماضية؟")
+
+def fetch_data():
     url = "https://api.mexc.com/api/v3/ticker/24hr"
     try: return requests.get(url, timeout=5).json()
     except: return None
@@ -16,56 +23,55 @@ def fetch_all():
 placeholder = st.empty()
 
 while True:
-    data = fetch_all()
+    data = fetch_data()
     if data:
-        # أضفنا عملات أكتر عشان "لازم" نلاقي فرصة
-        targets = [
-            'PEPEUSDT', 'SHIBUSDT', 'BONKUSDT', 'FLOKIUSDT', 'LUNCUSDT', 
-            '1000SATSUSDT', 'RATSUSDT', 'TURBOUSDT', 'MEMEUSDT', 'PEOPLEUSDT'
-        ]
+        targets = ['PEPEUSDT', 'SHIBUSDT', 'BONKUSDT', 'FLOKIUSDT', 'LUNCUSDT', '1000SATSUSDT', 'RATSUSDT', 'XRPUSDT', 'SOLUSDT']
         results = []
         
         for item in data:
-            if item['symbol'] in targets:
-                symbol = item['symbol'].replace("USDT", "")
+            symbol = item['symbol']
+            if symbol in targets:
                 price = float(item['lastPrice'])
-                change = float(item['priceChangePercent'])
-                vol = float(item['quoteVolume'])
+                current_vol = float(item['quoteVolume'])
                 
-                # معادلة "الزخم الخفي" - بتكشف الحركة حتى لو السعر لسه منطلقش قوي
-                momentum = (abs(change) * 2) + (vol / 1000000)
+                # حساب "السيولة الجديدة" (اللي دخلت في آخر 10 ثواني)
+                prev_v = st.session_state.prev_vol.get(symbol, current_vol)
+                new_money = current_vol - prev_v
+                st.session_state.prev_vol[symbol] = current_vol
                 
-                if change > 0.5 and vol > 500000:
-                    status = "✅ بداية تسخين"
-                elif change > 3:
-                    status = "🚀 انطلاق"
+                # تقييم الفرصة بناءً على "دخول المال"
+                if new_money > 5000: # لو دخل أكتر من 5000 دولار في ثواني
+                    status = "🚨 دخول سيولة فوري!"
+                    color = "#ff4b4b"
+                    play_alert()
+                elif new_money > 1000:
+                    status = "💰 تجميع هادئ"
+                    color = "#00ff00"
                 else:
-                    status = "💤 انتظار"
+                    status = "💤 سكون"
+                    color = "white"
 
                 results.append({
-                    "العملة": symbol,
+                    "العملة": symbol.replace("USDT", ""),
                     "السعر": f"${price:.8f}",
-                    "قوة الحركة": round(momentum, 2),
-                    "الوضع": status
+                    "فلوس دخلت الآن": f"${new_money:,.2f}",
+                    "حالة السيولة": status
                 })
 
         with placeholder.container():
-            # رتّب الجدول بحيث "أقوى" عملة تكون فوق دايماً
-            df = pd.DataFrame(results).sort_values(by="قوة الحركة", ascending=False)
+            # ترتيب حسب السيولة الجديدة
+            df = pd.DataFrame(results).sort_values(by="فلوس دخلت الآن", ascending=False)
             
-            st.subheader("📊 ترتيب العملات حسب 'الأقوى' الآن")
+            # عرض كروت العملات اللي بيدخل فيها فلوس "حالا"
+            hot_coins = df[df['فلوس دخلت الآن'].str.replace('$', '').str.replace(',', '').astype(float) > 1000]
             
-            def style_status(val):
-                if "انطلاق" in val: return 'background-color: #900c3f; color: white'
-                if "تسخين" in val: return 'background-color: #1d4e89; color: white'
-                return ''
+            if not hot_coins.empty:
+                cols = st.columns(len(hot_coins[:3]))
+                for i, row in enumerate(hot_coins.iloc[:3].to_dict('records')):
+                    cols[i].success(f"🔥 {row['العملة']} دخل فيها {row['فلوس دخلت الآن']}")
 
-            st.table(df.style.applymap(style_status, subset=['الوضع']))
-            
-            # نصيحة لو مفيش هجوم
-            if not any(x in ["🚀 انطلاق", "✅ بداية تسخين"] for x in df['الوضع']):
-                st.warning("⚠️ السوق هادئ جداً الآن. لا تخاطر بالـ 100 جنيه، انتظر 'بداية تسخين' على الأقل.")
-            else:
-                st.balloons() # احتفال بسيط لو فيه انطلاق
+            st.write("---")
+            st.table(df.drop(columns=[]))
+            st.caption(f"مراقبة النبض اللحظي للسوق - تحديث كل 10 ثواني")
 
-    time.sleep(5)
+    time.sleep(10)
