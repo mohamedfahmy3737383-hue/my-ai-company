@@ -2,87 +2,91 @@ import streamlit as st
 import pandas as pd
 import yfinance as ticker
 import time
-import numpy as np
 
-st.set_page_config(page_title="Crypto Predictor Pro", layout="wide")
+st.set_page_config(page_title="Crypto Sniper Elite", layout="wide")
 
-st.title("🔮 كاشف الانفجار القادم (Predictor)")
+st.title("🏛️ مركز قيادة الإمبراطورية: الإشارات والتوقعات")
 
-# 💰 إعدادات المحفظة
+# 💰 إدارة المحفظة
 st.sidebar.title("💰 شركة الـ 100 جنيه")
-asset_input = st.sidebar.text_input("العملة للمتابعة:", value="CHZ-USD").upper()
+asset_input = st.sidebar.text_input("رمز العملة للمتابعة (مثلاً CHZ-USD):", value="CHZ-USD").upper()
 buy_p = st.sidebar.number_input("سعر دخولك ($):", value=0.1500, format="%.4f")
 
-crypto_watchlist = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'CHZ-USD', 'DOGE-USD', 'PEPE24478-USD']
+crypto_watchlist = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'CHZ-USD', 'DOGE-USD', 'SHIB-USD', 'PEPE24478-USD', 'BONK-USD']
 
 placeholder = st.empty()
 
 while True:
     try:
-        # جلب بيانات كافية للحسابات الفنية (آخر 100 دقيقة)
+        # جلب البيانات لآخر 60 دقيقة
         data = ticker.download(crypto_watchlist, period="1d", interval="1m", progress=False)['Close']
         
         if not data.empty:
             results = []
-            data = data.fillna(method='ffill')
+            data = data.ffill().bfill()
             
             for sym in crypto_watchlist:
-                prices = data[sym].tail(20) # آخر 20 دقيقة
+                prices = data[sym]
                 curr_p = prices.iloc[-1]
+                prev_p_5 = prices.iloc[-5] # سعر قبل 5 دقائق
+                sma_20 = prices.tail(20).mean()
                 
-                # حساب النطاق (البولينجر) - قياس التذبذب
-                std_dev = prices.std()
-                sma = prices.mean()
+                # 1. حساب كاشف الانفجار (Squeeze)
+                price_range = (prices.tail(20).max() - prices.tail(20).min()) / prices.tail(20).mean()
+                is_squeezing = price_range < 0.0025 # نطاق ضيق جداً
                 
-                # كاشف الضغط (Squeeze): لو التذبذب قليل جداً يبقى فيه انفجار جاي
-                is_squeezing = std_dev < (prices.mean() * 0.001) 
+                # 2. منطق الإشارات (Buy/Sell)
+                change_5m = ((curr_p - prev_p_5) / prev_p_5) * 100
                 
-                # حساب التغير اللحظي
-                change = ((curr_p - prices.iloc[0]) / prices.iloc[0]) * 100
-                
-                # تحديد الحالة
-                if is_squeezing:
-                    status = "⚠️ شحن (انفجار قريب)"
-                    color = "orange"
-                elif change > 0.4:
-                    status = "🚀 هجوم مستمر"
-                    color = "green"
-                elif change < -0.4:
-                    status = "📉 هبوط حاد"
-                    color = "red"
+                if change_5m > 0.35 and curr_p > sma_20:
+                    signal = "🟢 شراء (BUY)"
+                elif change_5m < -0.30 or (curr_p < sma_20 and change_5m < 0):
+                    signal = "🔴 بيع (SELL)"
+                elif is_squeezing:
+                    signal = "⚠️ شحن (انفجار قريب)"
                 else:
-                    status = "📡 هدوء"
-                    color = "white"
+                    signal = "📡 مراقبة"
 
                 results.append({
                     "العملة": sym.replace("-USD", ""),
-                    "السعر ($)": f"{curr_p:.6f}" if curr_p < 0.1 else f"{curr_p:.4f}",
-                    "قوة التذبذب": round(std_dev, 6),
-                    "الحالة": status
+                    "السعر ($)": f"{curr_p:.8f}" if curr_p < 0.1 else f"{curr_p:.4f}",
+                    "تغير 5د %": round(change_5m, 3),
+                    "الإشارة / الحالة": signal
                 })
 
             df = pd.DataFrame(results)
 
             with placeholder.container():
                 # حساب الـ 100 جنيه
-                live_price = ticker.Ticker(asset_input).fast_info['last_price']
-                val_egp = ((2.0 / buy_p) * live_price) * 50 if buy_p > 0 else 100
+                try:
+                    live_info = ticker.Ticker(asset_input).fast_info['last_price']
+                    val_egp = ((2.0 / buy_p) * live_info) * 50 if buy_p > 0 else 100
+                except: val_egp = 100
                 
                 c1, c2, c3 = st.columns(3)
                 c1.metric(f"قيمة الـ 100ج في {asset_input}", f"{val_egp:.2f} ج.م", f"{val_egp-100:.2f}")
-                c2.metric("تنبؤ النظام", "⚠️ ترقب انفجار" if "شحن" in df.values else "✅ مستقر")
-                c3.metric("توقيت الرصد", time.strftime('%H:%M:%S'))
+                c2.metric("فرص السوق", f"{len(df[df['الإشارة / الحالة'].str.contains('شراء')])} فرصة دخول")
+                c3.metric("توقيت السيطرة", time.strftime('%H:%M:%S'))
 
                 st.write("---")
-                st.subheader("📊 رادار التوقع اللحظي")
-                st.table(df)
+                
+                # تنسيق الجدول بالألوان لتسهيل القنص
+                def color_signals(val):
+                    if "BUY" in val: color = '#00ff00' # أخضر فسفوري
+                    elif "SELL" in val: color = '#ff0000' # أحمر
+                    elif "شحن" in val: color = '#ffa500' # برتقالي
+                    else: color = 'white'
+                    return f'color: {color}; font-weight: bold'
 
-                # تنبيه خاص لو عملتك في حالة شحن
-                target_sym = asset_input.replace("-USD", "")
-                if any((df['العملة'] == target_sym) & (df['الحالة'].str.contains("شحن"))):
-                    st.warning(f"📢 يا مدير! عملة {target_sym} دلوقتي في حالة 'شحن طاقة'.. الانفجار قرب!")
+                st.table(df.style.applymap(color_signals, subset=['الإشارة / الحالة']))
+
+                # تنبيهات ذكية
+                if "🟢 شراء (BUY)" in df['الإشارة / الحالة'].values:
+                    st.toast("🚀 تم رصد إشارة دخول قوية!", icon="💰")
+                if "⚠️ شحن" in df['الإشارة / الحالة'].values:
+                    st.toast("⚠️ عملة تستعد للانفجار..", icon="⚡")
 
     except Exception as e:
-        st.info("🔄 جاري تحديث الحسابات الفنية...")
+        pass 
     
-    time.sleep(15)
+    time.sleep(12)
