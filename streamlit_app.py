@@ -3,80 +3,65 @@ import pandas as pd
 import requests
 import time
 
-st.set_page_config(page_title="Whale Hunter Pro 🐋", layout="wide")
+st.set_page_config(page_title="AI Portfolio Manager 💰", layout="wide")
 
-st.title("🐋 رادار كشف الحيتان وتوقعات السوق")
-st.write("رأس المال: 100 جنيه | نظام تحليل السيولة المتقدم")
+# إعدادات المحفظة في الجنب
+st.sidebar.title("💰 محفظة الـ 100 جنيه")
+capital_egp = 100
+usd_rate = 50 # سعر افتراضي للدولار مقابل الجنيه
+capital_usd = capital_egp / usd_rate
+
+selected_coin = st.sidebar.selectbox("العملة التي اشتريتها:", ['BTC', 'ETH', 'SOL', 'PEPE', 'SHIB', 'FLOKI'])
+buy_price = st.sidebar.number_input("سعر الشراء (بالدولار):", value=0.00000001, format="%.8f")
+
+st.title("🚀 رادار الأرباح اللحظي")
 
 def get_mexc_stats():
     url = "https://api.mexc.com/api/v3/ticker/24hr"
-    try:
-        response = requests.get(url, timeout=5)
-        return response.json()
-    except:
-        return None
+    try: return requests.get(url, timeout=5).json()
+    except: return None
 
 placeholder = st.empty()
 
 while True:
     stats_data = get_mexc_stats()
     if stats_data:
-        # قائمة العملات المستهدفة (الكبيرة والرخيصة)
-        targets = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT', 'LUNCUSDT', 'XRPUSDT']
+        targets = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT']
         final_list = []
+        current_holdings_value = 0
 
         for item in stats_data:
+            symbol_clean = item['symbol'].replace("USDT", "")
             if item['symbol'] in targets:
                 price = float(item['lastPrice'])
                 volume = float(item['quoteVolume'])
                 change = float(item['priceChangePercent'])
                 
-                # ذكاء اصطناعي بسيط للتوقع بناءً على السعر والحجم
-                if change > 0 and volume > 5000000:
-                    prediction = "🚀 صعود مستمر"
-                elif change < -5 and volume > 5000000:
-                    prediction = "📉 هبوط حاد"
-                elif change > 3:
-                    prediction = "↗️ ارتداد إيجابي"
-                else:
-                    prediction = "➡️ استقرار"
-
+                # حساب أرباح المحفظة لو دي العملة اللي اخترتها
+                if symbol_clean == selected_coin:
+                    units = capital_usd / buy_price
+                    current_holdings_value = units * price
+                
                 final_list.append({
-                    "العملة": item['symbol'].replace("USDT", ""),
+                    "العملة": symbol_clean,
                     "السعر": f"${price:.8f}",
-                    "تغير 24س": change,
-                    "السيولة": volume,
-                    "قوة الحيتان": "🐳 حيتان" if volume > 10000000 else "🐟 أفراد",
-                    "توقع الذكاء": prediction
+                    "التغير": f"{change}%",
+                    "قوة الحيتان": "🐳" if volume > 10000000 else "🐟",
+                    "التوقع": "🚀 صعود" if change > 2 else "➡️ استقرار"
                 })
 
-        if final_list:
-            df = pd.DataFrame(final_list)
+        with placeholder.container():
+            # عرض حالة الـ 100 جنيه فوق
+            profit_loss = current_holdings_value - capital_usd
+            profit_percent = (profit_loss / capital_usd) * 100 if capital_usd > 0 else 0
             
-            with placeholder.container():
-                # كروت الإحصائيات (بدون أخطاء حسابية)
-                c1, c2, c3 = st.columns(3)
-                top_coin = df.iloc[df['السيولة'].idxmax()]
-                c1.metric("أكثر عملة سيولة", top_coin['العملة'])
-                c2.metric("حجم سيولتها", f"${top_coin['السيولة']:,.0f}")
-                c3.metric("تحديث تلقائي", time.strftime('%H:%M:%S'))
+            col1, col2, col3 = st.columns(3)
+            col1.metric("قيمة الـ 100 جنيه الآن", f"{(current_holdings_value * usd_rate):,.2f} ج.م")
+            col2.metric("صافي الربح/الخسارة", f"{(profit_loss * usd_rate):,.2f} ج.م", f"{profit_percent:.2f}%")
+            col3.metric("توقيت السوق", time.strftime('%H:%M:%S'))
 
-                st.write("### 📊 لوحة تحكم الصياد")
-                
-                # تنسيق الجدول الملون
-                def style_prediction(val):
-                    if "🚀" in val: return 'color: #00ff00; font-weight: bold'
-                    if "📉" in val: return 'color: #ff0000; font-weight: bold'
-                    return ''
+            st.write("---")
+            st.write("### 📊 تحديثات العملات والسيولة")
+            st.table(pd.DataFrame(final_list))
 
-                # عرض الجدول بشكل احترافي
-                display_df = df.copy()
-                display_df['تغير 24س'] = display_df['تغير 24س'].map("{:.2f}%".format)
-                display_df['السيولة'] = display_df['السيولة'].map("${:,.0f}".format)
-                
-                st.table(display_df.style.applymap(style_prediction, subset=['توقع الذكاء']))
-                
-                if "🚀" in df['توقع الذكاء'].values:
-                    st.toast("تم رصد عملة تنطلق الآن!", icon="🔥")
-
-    time.sleep(10)
+    time.sleep(5)
