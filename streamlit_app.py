@@ -1,34 +1,56 @@
+import streamlit as st
 import ccxt
+import pandas as pd
 import time
 
-def start_analyst_bot():
-    ex1 = ccxt.kucoin()
-    ex2 = ccxt.gateio()
-    symbol = 'BTC/USDT'
-    investment = 1000  # تخيل إننا داخلين بـ 1000 دولار
-    
-    print(f"--- الموظف المحلل بدأ العمل (رأس المال الافتراضي: ${investment}) ---")
-    
-    for i in range(15):
-        try:
-            p1 = ex1.fetch_ticker(symbol)['last']
-            p2 = ex2.fetch_ticker(symbol)['last']
-            
-            # حساب الفرق والنسبة
-            diff = abs(p1 - p2)
-            p_diff = (diff / min(p1, p2)) * 100
-            
-            # خصم العمولات (تقريباً 0.2% للعملية الكاملة)
-            net_profit_percent = p_diff - 0.2
-            potential_money = (net_profit_percent / 100) * investment
-            
-            if net_profit_percent > 0:
-                print(f"✅ فرصة ربح! صافي الربح: {net_profit_percent:.4f}% | دولار: ${potential_money:.2f}")
-            else:
-                print(f"⏳ مراقبة.. الفرق الحالي {p_diff:.4f}% (غير مربح بعد الخصم)")
-                
-            time.sleep(4)
-        except Exception as e:
-            print(f"تنبيه: {e}")
+st.set_page_config(page_title="AI Arbitrage Radar", layout="wide")
+st.title("🚀 رادار صيد فرص المراجحة")
 
-start_analyst_bot()
+# تعريف المنصات
+exchanges = {
+    'KuCoin': ccxt.kucoin(),
+    'Gate.io': ccxt.gateio(),
+    'Bybit': ccxt.bybit()
+}
+
+symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT', 'AVAX/USDT']
+
+# مكان عرض البيانات
+placeholder = st.empty()
+
+while True:
+    data = []
+    for symbol in symbols:
+        try:
+            prices = {}
+            for name, ex in exchanges.items():
+                prices[name] = ex.fetch_ticker(symbol)['last']
+            
+            # حساب أعلى وأقل سعر بين المنصات
+            max_p = max(prices.values())
+            min_p = min(prices.values())
+            diff = ((max_p - min_p) / min_p) * 100
+            
+            data.append({
+                "العملة": symbol,
+                "أقل سعر": min_p,
+                "أعلى سعر": max_p,
+                "الفرق %": round(diff, 3)
+            })
+        except:
+            continue
+
+    df = pd.DataFrame(data)
+
+    with placeholder.container():
+        # عرض "كروت" للفرص القوية
+        cols = st.columns(len(data))
+        for i, row in df.iterrows():
+            color = "green" if row['الفرق %'] > 0.3 else "normal"
+            cols[i].metric(row['العملة'], f"{row['الفرق %']}%", delta=f"{row['الفرق %']}%", delta_color=color)
+        
+        st.write("### جدول التفاصيل اللحظي")
+        st.table(df)
+        st.write(f"آخر تحديث: {time.strftime('%H:%M:%S')}")
+
+    time.sleep(10) # تحديث كل 10 ثواني
