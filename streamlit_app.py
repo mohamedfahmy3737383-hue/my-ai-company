@@ -3,76 +3,68 @@ import pandas as pd
 import yfinance as ticker
 import time
 
-st.set_page_config(page_title="Global Empire Dashboard", layout="wide")
+# 1. إعدادات السيطرة
+st.set_page_config(page_title="Global Sniper Elite", layout="wide")
 
-st.title("🏛️ إمبراطورية الـ 100 جنيه - مركز السيطرة العالمي")
-st.write("الرادار يراقب الآن: الكريبتو، الأسهم الأمريكية، والذهب")
+st.title("🌐 رادار السيطرة العالمية (النسخة النووية)")
+st.write("البيانات تتدفق الآن عبر أقوى سيرفرات البورصة العالمية")
 
-# 💰 إدارة الأصول المتعددة
-st.sidebar.title("💳 محفظة الإمبراطورية")
-asset_type = st.sidebar.selectbox("نوع الأصول:", ["كريبتو", "أسهم عالمية", "معادن"])
-target_asset = st.sidebar.text_input("رمز الأصول (مثلاً AAPL أو Gold):", value="CHZ-USD").upper()
-buy_price = st.sidebar.number_input("سعر دخولك ($):", value=0.15, format="%.4f")
-
-# القائمة العالمية الجديدة
-world_radar = {
-    'الذهب': 'GC=F',
-    'بتكوين': 'BTC-USD',
-    'تسلا': 'TSLA',
-    'إنفيدا': 'NVDA',
-    'أبل': 'AAPL',
-    'تشيليز': 'CHZ-USD',
-    'الدولار/جنيه': 'EGP=X'
-}
+# 2. إدارة محفظة الـ 100 جنيه
+st.sidebar.title("💰 شركة الـ 100 جنيه")
+asset_name = st.sidebar.text_input("اكتب اختصار عملتك (مثلاً CHZ-USD أو PEPE24478-USD):", value="CHZ-USD").upper()
+buy_p = st.sidebar.number_input("سعر شرائك بالدولار ($):", value=0.15, format="%.4f")
 
 placeholder = st.empty()
 
+# قائمة العملات اللي هنراقبها (أقوى عملات العالم)
+watchlist = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'CHZ-USD', 'DOGE-USD', 'SHIB-USD', 'PEPE24478-USD']
+
 while True:
     try:
-        # سحب بيانات السوق الشامل
-        data = ticker.download(list(world_radar.values()), period="1d", interval="1m", progress=False)['Close']
+        # سحب البيانات من سيرفرات ياهو فاينانس (الأقوى عالمياً)
+        data = ticker.download(watchlist, period="1d", interval="1m", progress=False)['Close']
         
         if not data.empty:
             results = []
-            last_p = data.iloc[-1]
-            prev_p = data.iloc[-5] if len(data) > 5 else data.iloc[0]
+            last_prices = data.iloc[-1]
+            prev_prices = data.iloc[-5] if len(data) > 5 else data.iloc[0]
             
-            for name, sym in world_radar.items():
-                curr = float(last_p[sym])
-                change = ((curr - float(prev_p[sym])) / float(prev_p[sym])) * 100
+            for sym in watchlist:
+                curr_p = float(last_prices[sym])
+                old_p = float(prev_prices[sym])
+                change = ((curr_p - old_p) / old_p) * 100
                 
                 results.append({
-                    "الأصل": name,
-                    "الرمز": sym,
-                    "السعر الحالي": f"{curr:,.2f}$",
-                    "الحركة اللحظية %": round(change, 3),
-                    "الوضع": "🔥 انفجار" if change > 0.2 else "🟢 صعود" if change > 0 else "🔴 هبوط"
+                    "العملة": sym.replace("-USD", ""),
+                    "السعر ($)": f"{curr_p:.6f}" if curr_p < 1 else f"{curr_p:.2f}",
+                    "تغير لحظي %": round(change, 2),
+                    "القرار": "🚀 هجوم" if change > 0.5 else "📡 رصد"
                 })
 
             df = pd.DataFrame(results)
 
             with placeholder.container():
-                # حساب قيمة الـ 100 جنيه في الإمبراطورية
+                # حساب الأرباح (الـ 100 جنيه)
+                # بنشوف سعر العملة اللي انت كاتبها في السايد بار
                 try:
-                    live_price = ticker.Ticker(target_asset).fast_info['last_price']
-                    current_value = ((2.0 / buy_price) * live_price) * 50
-                except: current_value = 100
-
+                    target_data = ticker.Ticker(asset_name).fast_info['last_price']
+                    val_egp = ((2.0 / buy_p) * target_data) * 50 if buy_p > 0 else 100
+                except:
+                    val_egp = 100
+                
                 c1, c2, c3 = st.columns(3)
-                c1.metric("قيمة الـ 100ج الآن", f"{current_value:.2f} ج.م", f"{current_value-100:.2f}")
-                c2.metric("أقوى أصل متحرك", df.sort_values(by="الحركة اللحظية %").iloc[-1]['الأصل'])
-                c3.metric("توقيت الإمبراطورية", time.strftime('%H:%M:%S'))
+                c1.metric(f"قيمة الـ 100ج في {asset_name}", f"{val_egp:.2f} ج.م", f"{val_egp-100:.2f}")
+                c2.metric("حالة الربط", "✅ فولاذي")
+                c3.metric("نبض السوق", time.strftime('%H:%M:%S'))
 
                 st.write("---")
-                st.subheader("📊 رادار الأسواق العالمية المختلطة")
-                st.table(df)
+                st.subheader("📊 رادار الانفجارات اللحظي")
+                st.table(df.sort_values(by="تغير لحظي %", ascending=False))
                 
-                # نصيحة الإمبراطور
-                if "🔥 انفجار" in df['الوضع'].values:
-                    st.balloons()
-                    st.success("🚨 يا مدير! فيه فرصة تاريخية بتحصل في الأسواق دلوقتي!")
-
+                if "🚀 هجوم" in df['القرار'].values:
+                    st.warning("🔥 انتباه! فيه عملة بتنفجر دلوقتي، بص على الجدول!")
+        
     except Exception as e:
-        st.error(f"محاولة ربط الإمبراطورية بالسوق... {e}")
+        st.error(f"جاري إعادة الاتصال بالسيرفر النووي... {e}")
 
     time.sleep(20)
