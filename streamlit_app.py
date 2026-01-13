@@ -1,63 +1,54 @@
 import streamlit as st
-import ccxt
 import pandas as pd
+import requests
 import time
 
 st.set_page_config(page_title="AI Arbitrage Radar", layout="wide")
-st.title("🚀 رادار صيد فرص المراجحة")
+st.title("🚀 رادار صيد فرص المراجحة - النسخة السريعة")
 
-@st.cache_resource
-def init_exchanges():
-    # استخدام منصات بديلة "أسهل" في الربط
-    return {
-        'MEXC': ccxt.mexc({'enableRateLimit': True}),
-        'Bybit': ccxt.bybit({'enableRateLimit': True}),
-        'OKX': ccxt.okx({'enableRateLimit': True})
-    }
+# دالة بسيطة جداً لسحب الأسعار من غير تعقيد
+def get_price(symbol):
+    try:
+        # هنجيب السعر من منصة Binance و MEXC و GateIO عبر API عام وسريع
+        urls = {
+            'Binance': f"https://api.binance.com/api/v3/ticker/price?symbol={symbol.replace('/', '')}",
+            'MEXC': f"https://www.mexc.com/open/api/v2/market/ticker?symbol={symbol.replace('/', '_')}"
+        }
+        prices = {}
+        for name, url in urls.items():
+            res = requests.get(url, timeout=5).json()
+            if name == 'Binance': prices[name] = float(res['price'])
+            if name == 'MEXC': prices[name] = float(res['data'][0]['last'])
+        return prices
+    except:
+        return None
 
-exchanges = init_exchanges()
-# قللنا عدد العملات لـ 3 بس في البداية عشان نتأكد إن الاتصال تمام
-symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
-
+symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT']
 placeholder = st.empty()
 
 while True:
-    all_data = []
-    with st.spinner('جاري فحص السوق...'):
-        for symbol in symbols:
-            try:
-                # محاولة سحب السعر بذكاء
-                p_mexc = exchanges['MEXC'].fetch_ticker(symbol)['last']
-                p_bybit = exchanges['Bybit'].fetch_ticker(symbol)['last']
-                
-                prices = {'MEXC': p_mexc, 'Bybit': p_bybit}
-                min_p = min(prices.values())
-                max_p = max(prices.values())
+    data = []
+    with st.spinner('جاري قنص الأسعار...'):
+        for sym in symbols:
+            prices = get_price(sym)
+            if prices and len(prices) > 1:
+                p_list = list(prices.values())
+                min_p, max_p = min(p_list), max_p(p_list)
                 diff = ((max_p - min_p) / min_p) * 100
-                
-                all_data.append({
-                    "العملة": symbol,
-                    "أقل سعر": min_p,
-                    "أعلى سعر": max_p,
-                    "الفرق %": round(diff, 3)
-                })
-                time.sleep(1) # استراحة ثانية بين كل عملة وعملة عشان ميتعملش بلوك
-            except Exception as e:
-                # لو عايز تشوف المشكلة إيه بالظبط فك السطر اللي جاي
-                # st.error(f"Error fetching {symbol}: {e}")
-                continue
-
-    if len(all_data) > 0:
-        df = pd.DataFrame(all_data)
+                data.append({"العملة": sym, "أقل سعر": min_p, "أعلى سعر": max_p, "الفرق %": round(diff, 3)})
+    
+    if data:
         with placeholder.container():
-            st.write(f"### 📊 تحديث لحظي ({time.strftime('%H:%M:%S')})")
-            for _, row in df.iterrows():
-                # تلوين الخلفية لو الفرق حلو
-                color = "green" if row['الفرق %'] > 0.1 else "blue"
-                st.info(f"**{row['العملة']}** | الفرق: **{row['الفرق %']}%** | السعر: {row['أقل سعر']} ➡️ {row['أعلى سعر']}")
+            st.success(f"✅ الرادار يعمل بكفاءة - تحديث: {time.strftime('%H:%M:%S')}")
+            df = pd.DataFrame(data)
+            
+            # عرض كروت سريعة للتابلت
+            cols = st.columns(len(data))
+            for i, row in df.iterrows():
+                cols[i].metric(row['العملة'], f"{row['الفرق %']}%")
             
             st.table(df)
     else:
-        st.warning("🔄 جاري محاولة إعادة الاتصال بالبورصة... تأكد من استقرار الإنترنت.")
-
-    time.sleep(15)
+        st.error("⚠️ السيرفر يحاول تجاوز حماية المنصة.. انتظر ثواني")
+    
+    time.sleep(10)
