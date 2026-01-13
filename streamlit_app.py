@@ -3,23 +3,20 @@ import pandas as pd
 import requests
 import time
 
-st.set_page_config(page_title="Professional Sniper", layout="wide")
+st.set_page_config(page_title="Mega Opp Hunter 🚀", layout="wide")
 
-# نظام إدارة التنبيهات عشان الصوت ميشتغلش باستمرار
-if 'alerted_symbols' not in st.session_state:
-    st.session_state.alerted_symbols = {}
-if 'last_signals' not in st.session_state:
-    st.session_state.last_signals = {}
+# مخزن البيانات للحفاظ على سجل الفرص
+if 'opportunity_history' not in st.session_state:
+    st.session_state.opportunity_history = []
 
-# صوت تنبيه هادي لمرة واحدة
-def play_gentle_alert():
-    sound_html = """<audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" type="audio/mpeg"></audio>"""
-    st.components.v1.html(sound_html, height=0)
+def play_ping():
+    # صوت تنبيه قصير وذكي
+    st.components.v1.html("""<audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" type="audio/mpeg"></audio>""", height=0)
 
-st.title("🎯 رادار القنص الهادئ")
-st.write("الهدف: مراقبة صامتة وإشارات دخول واضحة للـ 100 جنيه")
+st.title("🚀 مركز عمليات القنص (نسخة استغلال الفرص)")
+st.write("الهدف: تحويل الـ 100 جنيه لأرباح متراكمة عن طريق ملاحقة الانفجارات السعرية")
 
-def get_data():
+def fetch_data():
     url = "https://api.mexc.com/api/v3/ticker/24hr"
     try: return requests.get(url, timeout=5).json()
     except: return None
@@ -27,56 +24,60 @@ def get_data():
 placeholder = st.empty()
 
 while True:
-    data = get_data()
+    data = fetch_data()
     if data:
-        targets = ['PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT', 'LUNCUSDT', 'SOLUSDT', 'XRPUSDT']
-        rows = []
-        current_time = time.time()
+        # العملات اللي بتعمل "انفجارات" حالياً
+        targets = ['PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT', 'LUNCUSDT', '1000SATSUSDT', 'BOMEUSDT', 'MEMEUSDT']
+        current_opportunities = []
         
         for item in data:
-            symbol = item['symbol']
-            if symbol in targets:
+            if item['symbol'] in targets:
+                symbol = item['symbol'].replace("USDT", "")
                 price = float(item['lastPrice'])
                 change = float(item['priceChangePercent'])
                 vol = float(item['quoteVolume'])
                 
-                # شرط الدخول (تحرك إيجابي + سيولة)
-                if change > 1.2 and vol > 1500000:
-                    # تفعيل الإشارة وتخزين وقتها
-                    st.session_state.last_signals[symbol] = current_time
-                    
-                    # تشغيل التنبيه مرة واحدة فقط لكل عملة كل 5 دقائق عشان ميزعجكش
-                    last_alert_time = st.session_state.alerted_symbols.get(symbol, 0)
-                    if current_time - last_alert_time > 300: # 5 دقائق
-                        play_gentle_alert()
-                        st.session_state.alerted_symbols[symbol] = current_time
+                # حساب "درجة القوة" (معادلة خاصة بالشركة)
+                # بتجمع بين التغير السعري والسيولة
+                power_score = (change * 10) + (vol / 1000000)
                 
-                # الإشارة تفضل خضراء لمدة 60 ثانية
-                is_active = symbol in st.session_state.last_signals and (current_time - st.session_state.last_signals[symbol] < 60)
-                
-                rows.append({
-                    "العملة": symbol.replace("USDT", ""),
+                status = "⚪ هدوء"
+                if power_score > 50:
+                    status = "🔥 انفجار سعري!"
+                    if symbol not in [x['العملة'] for x in st.session_state.opportunity_history[-5:]]:
+                        play_ping()
+                        st.session_state.opportunity_history.append({"العملة": symbol, "الوقت": time.strftime('%H:%M:%S'), "القوة": round(power_score, 1)})
+                elif power_score > 20:
+                    status = "💹 بداية حركة"
+
+                current_opportunities.append({
+                    "العملة": symbol,
                     "السعر": f"${price:.8f}",
-                    "التغير": f"{change}%",
-                    "الحالة": "🟢 فرصة دخول" if is_active else "⚪ مراقبة",
-                    "السيولة": f"${vol:,.0f}"
+                    "التغير %": f"{change}%",
+                    "قوة الفرصة": round(power_score, 1),
+                    "القرار": status
                 })
 
         with placeholder.container():
-            # عرض الكروت النشطة فقط
-            active_list = [r for r in rows if "فرصة" in r['الحالة']]
-            if active_list:
-                st.success(f"قناص: تم رصد حركة في {', '.join([x['العملة'] for x in active_list])}. الإشارة ثابتة لمدة دقيقة.")
-            
-            st.write("---")
-            df = pd.DataFrame(rows)
-            
-            # تلوين الصفوف النشطة
-            def highlight_active(s):
-                return ['background-color: #004d00' if v == "🟢 فرصة دخول" else '' for v in s]
-            
-            st.table(df.style.apply(highlight_active, subset=['الحالة']))
-            
-            st.caption(f"آخر تحديث للرادار: {time.strftime('%H:%M:%S')}")
+            # الجزء العلوي: سجل آخر 3 فرص تم رصدهم
+            if st.session_state.opportunity_history:
+                st.subheader("📝 سجل القنص (آخر الفرص)")
+                cols = st.columns(3)
+                recent = st.session_state.opportunity_history[-3:][::-1]
+                for i, op in enumerate(recent):
+                    with cols[i]:
+                        st.info(f"📍 {op['العملة']} | قوة: {op['القوة']} | الساعة: {op['الوقت']}")
 
-    time.sleep(5)
+            st.write("---")
+            # الجدول الرئيسي
+            df = pd.DataFrame(current_opportunities)
+            
+            def color_decision(val):
+                if "🔥" in val: return 'background-color: #7a0000; color: white'
+                if "💹" in val: return 'background-color: #004d40; color: white'
+                return ''
+
+            st.subheader("📊 رادار الفرص اللحظي")
+            st.table(df.style.applymap(color_decision, subset=['القرار']))
+
+    time.sleep(4)
