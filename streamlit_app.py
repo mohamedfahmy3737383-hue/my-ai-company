@@ -3,36 +3,34 @@ import ccxt
 import pandas as pd
 import time
 
-# إعداد الصفحة
 st.set_page_config(page_title="AI Arbitrage Radar", layout="wide")
 st.title("🚀 رادار صيد فرص المراجحة")
 
-# تفعيل الربط مع المنصات
 @st.cache_resource
 def init_exchanges():
+    # استخدام منصات بديلة "أسهل" في الربط
     return {
-        'KuCoin': ccxt.kucoin(),
-        'Gate.io': ccxt.gateio(),
-        'Bybit': ccxt.bybit()
+        'MEXC': ccxt.mexc({'enableRateLimit': True}),
+        'Bybit': ccxt.bybit({'enableRateLimit': True}),
+        'OKX': ccxt.okx({'enableRateLimit': True})
     }
 
 exchanges = init_exchanges()
-symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT']
+# قللنا عدد العملات لـ 3 بس في البداية عشان نتأكد إن الاتصال تمام
+symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
 
 placeholder = st.empty()
 
 while True:
     all_data = []
-    
-    # رسالة تحميل بسيطة
-    with st.spinner('جاري صيد الأسعار من المنصات...'):
+    with st.spinner('جاري فحص السوق...'):
         for symbol in symbols:
             try:
-                prices = {}
-                for name, ex in exchanges.items():
-                    ticker = ex.fetch_ticker(symbol)
-                    prices[name] = ticker['last']
+                # محاولة سحب السعر بذكاء
+                p_mexc = exchanges['MEXC'].fetch_ticker(symbol)['last']
+                p_bybit = exchanges['Bybit'].fetch_ticker(symbol)['last']
                 
+                prices = {'MEXC': p_mexc, 'Bybit': p_bybit}
                 min_p = min(prices.values())
                 max_p = max(prices.values())
                 diff = ((max_p - min_p) / min_p) * 100
@@ -43,26 +41,23 @@ while True:
                     "أعلى سعر": max_p,
                     "الفرق %": round(diff, 3)
                 })
-            except:
+                time.sleep(1) # استراحة ثانية بين كل عملة وعملة عشان ميتعملش بلوك
+            except Exception as e:
+                # لو عايز تشوف المشكلة إيه بالظبط فك السطر اللي جاي
+                # st.error(f"Error fetching {symbol}: {e}")
                 continue
 
-    # التأكد من وجود بيانات قبل الرسم لتجنب الخطأ اللي ظهرلك
     if len(all_data) > 0:
         df = pd.DataFrame(all_data)
         with placeholder.container():
-            st.write("### 📊 الأسعار اللحظية")
-            
-            # عرض كل عملة في سطر منفصل (أضمن للتابلت وللكود)
+            st.write(f"### 📊 تحديث لحظي ({time.strftime('%H:%M:%S')})")
             for _, row in df.iterrows():
-                with st.expander(f"💰 {row['العملة']} - الفرق الحالي: {row['الفرق %']}%", expanded=True):
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("أقل سعر", f"${row['أقل سعر']:,.2f}")
-                    c2.metric("أعلى سعر", f"${row['أعلى سعر']:,.2f}")
-                    c3.metric("الربح المتوقع", f"{row['الفرق %']}%")
+                # تلوين الخلفية لو الفرق حلو
+                color = "green" if row['الفرق %'] > 0.1 else "blue"
+                st.info(f"**{row['العملة']}** | الفرق: **{row['الفرق %']}%** | السعر: {row['أقل سعر']} ➡️ {row['أعلى سعر']}")
             
-            st.divider()
-            st.caption(f"آخر تحديث للسيرفر: {time.strftime('%H:%M:%S')}")
+            st.table(df)
     else:
-        st.warning("⚠️ لم يتمكن الموظف الـ AI من سحب البيانات حالياً.. سيحاول مجدداً خلال ثواني.")
+        st.warning("🔄 جاري محاولة إعادة الاتصال بالبورصة... تأكد من استقرار الإنترنت.")
 
-    time.sleep(20) # راحة للسيرفر
+    time.sleep(15)
