@@ -3,18 +3,12 @@ import pandas as pd
 import requests
 import time
 
-st.set_page_config(page_title="Max Opportunity Hunter", layout="wide")
+st.set_page_config(page_title="Opportunity Seeker PRO", layout="wide")
 
-# مخزن ذكي للشركة
-if 'last_action' not in st.session_state:
-    st.session_state.last_action = "انتظار"
+st.title("🏹 رادار قنص الفرص النادرة")
+st.write("الرادار الآن يبحث في 'أعماق السوق' عن أي حركة مخفية للـ 100 جنيه")
 
-def play_alert():
-    st.components.v1.html("""<audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" type="audio/mpeg"></audio>""", height=0)
-
-st.title("🏹 مركز قنص الأرباح - شركة الـ 100 جنيه")
-
-def fetch_market():
+def fetch_all():
     url = "https://api.mexc.com/api/v3/ticker/24hr"
     try: return requests.get(url, timeout=5).json()
     except: return None
@@ -22,10 +16,13 @@ def fetch_market():
 placeholder = st.empty()
 
 while True:
-    data = fetch_market()
+    data = fetch_all()
     if data:
-        # العملات الرخيصة (بتاعة الـ 100 جنيه)
-        targets = ['PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT', 'LUNCUSDT', 'BOMEUSDT']
+        # أضفنا عملات أكتر عشان "لازم" نلاقي فرصة
+        targets = [
+            'PEPEUSDT', 'SHIBUSDT', 'BONKUSDT', 'FLOKIUSDT', 'LUNCUSDT', 
+            '1000SATSUSDT', 'RATSUSDT', 'TURBOUSDT', 'MEMEUSDT', 'PEOPLEUSDT'
+        ]
         results = []
         
         for item in data:
@@ -35,55 +32,40 @@ while True:
                 change = float(item['priceChangePercent'])
                 vol = float(item['quoteVolume'])
                 
-                # حساب قوة الفرصة (كل ما الرقم زاد، كل ما كان المكسب أقرب)
-                score = (change * 5) + (vol / 2000000)
+                # معادلة "الزخم الخفي" - بتكشف الحركة حتى لو السعر لسه منطلقش قوي
+                momentum = (abs(change) * 2) + (vol / 1000000)
                 
-                # تحديد "أمر العمل"
-                if score > 40:
-                    action = "🚀 هجوم (شراء فوري)"
-                    color = "red" # لون ينبهك
-                elif score > 15:
-                    action = "🎯 تجهيز (راقب السعر)"
-                    color = "green"
-                elif change < -3:
-                    action = "⚠️ هروب (بيع لو معاك)"
-                    color = "orange"
+                if change > 0.5 and vol > 500000:
+                    status = "✅ بداية تسخين"
+                elif change > 3:
+                    status = "🚀 انطلاق"
                 else:
-                    action = "⏳ سكون"
-                    color = "white"
+                    status = "💤 انتظار"
 
                 results.append({
                     "العملة": symbol,
                     "السعر": f"${price:.8f}",
-                    "حركة 24س": f"{change}%",
-                    "قوة الفرصة": round(score, 2),
-                    "أمر الشركة": action
+                    "قوة الحركة": round(momentum, 2),
+                    "الوضع": status
                 })
 
         with placeholder.container():
-            # كارت "أقوى فرصة الآن"
-            top_opportunity = max(results, key=lambda x: x['قوة الفرصة'])
+            # رتّب الجدول بحيث "أقوى" عملة تكون فوق دايماً
+            df = pd.DataFrame(results).sort_values(by="قوة الحركة", ascending=False)
             
-            c1, c2 = st.columns([2, 1])
-            with c1:
-                st.markdown(f"""
-                <div style="background-color:#1e1e1e; padding:25px; border-radius:15px; border: 2px solid gold; text-align:center">
-                    <h2 style="color:white; margin:0">أفضل صيد للـ 100 جنيه الآن: {top_opportunity['العملة']}</h2>
-                    <h1 style="color:gold; font-size:50px; margin:10px">{top_opportunity['قوة الفرصة']}</h1>
-                    <h3 style="color:#00ff00">{top_opportunity['أمر الشركة']}</h3>
-                </div>
-                """, unsafe_allow_html=True)
+            st.subheader("📊 ترتيب العملات حسب 'الأقوى' الآن")
             
-            with c2:
-                st.metric("حالة السوق", "فرص مشتعلة" if top_opportunity['قوة الفرصة'] > 30 else "سوق هادئ")
-                st.write("🔍 **نصيحة المدير:**")
-                st.info("لو القوة وصلت 50، الـ 100 جنيه لازم تدخل فوراً في العملة دي.")
+            def style_status(val):
+                if "انطلاق" in val: return 'background-color: #900c3f; color: white'
+                if "تسخين" in val: return 'background-color: #1d4e89; color: white'
+                return ''
 
-            st.write("---")
-            st.subheader("📊 جدول البيانات التفصيلي")
-            st.table(pd.DataFrame(results))
+            st.table(df.style.applymap(style_status, subset=['الوضع']))
             
-            if top_opportunity['قوة الفرصة'] > 40:
-                play_alert()
+            # نصيحة لو مفيش هجوم
+            if not any(x in ["🚀 انطلاق", "✅ بداية تسخين"] for x in df['الوضع']):
+                st.warning("⚠️ السوق هادئ جداً الآن. لا تخاطر بالـ 100 جنيه، انتظر 'بداية تسخين' على الأقل.")
+            else:
+                st.balloons() # احتفال بسيط لو فيه انطلاق
 
-    time.sleep(4)
+    time.sleep(5)
