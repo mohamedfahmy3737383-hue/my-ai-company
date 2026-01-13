@@ -9,7 +9,16 @@ st.set_page_config(page_title="Global Command Final", layout="wide")
 if 'prev_v' not in st.session_state: st.session_state.prev_v = {}
 
 st.title("🌐 رادار السيطرة العالمية (نسخة اختراق الحجب)")
+# إضافة صوت تنبيه عند الهجوم
+def play_alarm():
+    st.components.v1.html(
+        """<audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" type="audio/mpeg"></audio>""",
+        height=0,
+    )
 
+# داخل حلقة الـ While، لو فيه هجوم:
+if "🚀 هجوم" in df['القرار'].values:
+    play_alarm()
 # 2. محفظة الـ 100 جنيه
 st.sidebar.title("💰 محفظة الـ 100 جنيه")
 asset_name = st.sidebar.text_input("اسم عملتك (مثل PEPE):", value="PEPE").upper()
