@@ -3,66 +3,81 @@ import pandas as pd
 import requests
 import time
 
-st.set_page_config(page_title="Real Profit Sniper 💰", layout="wide")
+st.set_page_config(page_title="Sniper Pro V3", layout="wide")
 
-st.title("💰 رادار المكسب الحقيقي (إصدار القناص)")
-st.write("الهدف: تحويل الـ 100 جنيه لأرباح حقيقية من خلال قنص السيولة")
+st.title("🏹 رادار القنص السريع (صيد السنتات)")
+st.write("الهدف: تحويل الـ 100 جنيه لأرباح تراكمية سريعة")
 
 def get_data():
+    # استخدام API مختلف يعطي بيانات أكثر دقة للحركة اللحظية
     url = "https://api.mexc.com/api/v3/ticker/24hr"
     try: return requests.get(url, timeout=5).json()
     except: return None
 
 placeholder = st.empty()
 
+# تخزين السعر القديم للمقارنة وحساب الانفجار اللحظي
+if 'old_prices' not in st.session_state:
+    st.session_state.old_prices = {}
+
 while True:
     data = get_data()
     if data:
-        # العملات الأكثر ربحية للرأس المال الصغير
-        targets = ['PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT', 'LUNCUSDT', 'XRPUSDT', 'SOLUSDT']
+        # قائمة أوسع من العملات الرخيصة والمجنونة
+        targets = ['PEPEUSDT', 'SHIBUSDT', 'FLOKIUSDT', 'BONKUSDT', 'LUNCUSDT', 'XECUSDT', 'BTTCUSDT', 'GASUSDT', 'ORDIUSDT']
         rows = []
         
         for item in data:
-            if item['symbol'] in targets:
+            symbol = item['symbol']
+            if symbol in targets:
                 price = float(item['lastPrice'])
                 vol = float(item['quoteVolume'])
-                change = float(item['priceChangePercent'])
+                change_24h = float(item['priceChangePercent'])
                 
-                # معادلة المكسب الحقيقي
-                if change > 1 and vol > 5000000:
-                    signal = "🔥 اشتري الآن (فرصة مكسب)"
-                elif change < -2:
-                    signal = "⚠️ خطر (هروب السيولة)"
+                # حساب الحركة "اللحظية" (Scalping Detection)
+                old_price = st.session_state.old_prices.get(symbol, price)
+                instant_move = ((price - old_price) / old_price) * 100 if old_price > 0 else 0
+                st.session_state.old_prices[symbol] = price
+                
+                # إشارة الدخول (شروط أسهل للمكسب السريع)
+                if instant_move > 0.02 or (change_24h > 2 and vol > 1000000):
+                    signal = "✅ دخول سريع (سكالبينج)"
+                    color = "#00ff00"
+                elif instant_move < -0.02:
+                    signal = "🔻 هبوط لحظي"
+                    color = "#ff4b4b"
                 else:
-                    signal = "⏳ انتظر إشارة"
+                    signal = "⌛ انتظار"
+                    color = "#ffffff"
 
                 rows.append({
-                    "العملة": item['symbol'].replace("USDT", ""),
-                    "السعر الحالي": f"${price:.8f}",
-                    "حركة 24س": f"{change}%",
-                    "السيولة ($)": f"{vol:,.0f}",
-                    "الإشارة": signal
+                    "العملة": symbol.replace("USDT", ""),
+                    "السعر": f"${price:.8f}",
+                    "السيولة": f"${vol:,.0f}",
+                    "حركة لحظية": f"{instant_move:+.4f}%",
+                    "الإشارة": signal,
+                    "color": color
                 })
 
         with placeholder.container():
-            # عرض أقوى فرصة في كارت كبير
-            best_opportunity = max(rows, key=lambda x: float(x['حركة 24س'].replace('%','')))
+            # عرض "الفرصة الذهبية"
+            st.subheader(f"📡 حالة الرادار: {time.strftime('%H:%M:%S')}")
             
-            c1, c2 = st.columns([2, 1])
-            with c1:
-                st.markdown(f"""
-                <div style="background-color:#1b4d3e; padding:20px; border-radius:15px; text-align:center">
-                    <h2 style="color:white">أقوى فرصة للمكسب الآن: {best_opportunity['العملة']}</h2>
-                    <h1 style="color:#00ff00">{best_opportunity['الإشارة']}</h1>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with c2:
-                st.metric("تحديث الرادار", time.strftime('%H:%M:%S'))
-                st.write("نصيحة: لا تدخل الصفقة إلا لو الإشارة 'اشتري الآن' والسيولة فوق 5 مليون.")
+            # تصميم كروت احترافية
+            cols = st.columns(len(rows[:4])) # عرض أول 4 عملات ككروت
+            for i, row in enumerate(rows[:4]):
+                with cols[i]:
+                    st.markdown(f"""
+                    <div style="background-color:#1e1e1e; padding:10px; border-radius:10px; border-left: 5px solid {row['color']}">
+                        <h4 style="margin:0">{row['العملة']}</h4>
+                        <p style="color:{row['color']}; font-weight:bold; margin:0">{row['الإشارة']}</p>
+                        <p style="font-size:12px; margin:0">حركة: {row['حركة لحظية']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
             st.write("---")
-            df = pd.DataFrame(rows)
+            # الجدول الكامل
+            df = pd.DataFrame(rows).drop(columns=['color'])
             st.table(df)
 
-    time.sleep(5)
+    time.sleep(3) # تحديث كل 3 ثواني لقنص الحركة
